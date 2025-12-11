@@ -16,10 +16,11 @@ export async function createUser(
   name: string,
   role: UserRole = UserRole.EMPLOYEE
 ) {
+  const normalizedEmail = email.toLowerCase()
   const passwordHash = await hashPassword(password)
   return prisma.user.create({
     data: {
-      email,
+      email: normalizedEmail,
       passwordHash,
       name,
       role,
@@ -29,7 +30,7 @@ export async function createUser(
 
 export async function getUserByEmail(email: string) {
   return prisma.user.findUnique({
-    where: { email },
+    where: { email: email.toLowerCase() },
   })
 }
 
@@ -38,12 +39,12 @@ export async function verifyUser(email: string, password: string) {
   if (!user) {
     return null
   }
-  
+
   const isValid = await verifyPassword(password, user.passwordHash)
   if (!isValid) {
     return null
   }
-  
+
   return user
 }
 

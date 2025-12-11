@@ -1,0 +1,1 @@
+-- CreateTable migrations already applied via db push

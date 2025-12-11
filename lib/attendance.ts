@@ -117,11 +117,25 @@ export function getCheckInDeadline(
   shiftDate: Date,
   userCheckInTime?: string | null
 ): Date {
-  const deadline = new Date(shiftDate)
   const checkInTime = getUserCheckInTime(userCheckInTime)
-  const [hours, minutes] = checkInTime.split(':').map(Number)
-  deadline.setHours(hours, minutes + LATE_THRESHOLD_MINUTES, 0, 0)
-  return deadline
+  // shiftDate is the base "Day". We need "Day + Time" in Target Timezone.
+
+  const year = shiftDate.getFullYear()
+  const month = String(shiftDate.getMonth() + 1).padStart(2, '0')
+  const day = String(shiftDate.getDate()).padStart(2, '0')
+
+  // Hardcoded +05:00 for Asia/Karachi as Vercel/Node doesn't support easy TZ parsing without libs
+  // Ideally we match DEFAULT_TIMEZONE
+  // const offset = DEFAULT_TIMEZONE === 'Asia/Karachi' ? '+05:00' : 'Z'
+  const offset = '+05:00'
+
+  const scheduledIsoString = `${year}-${month}-${day}T${checkInTime}:00${offset}`
+  const deadlineBase = new Date(scheduledIsoString)
+
+  // Add threshold
+  deadlineBase.setMinutes(deadlineBase.getMinutes() + LATE_THRESHOLD_MINUTES)
+
+  return deadlineBase
 }
 
 /**
@@ -141,7 +155,16 @@ export function getAttendanceStatus(
   scheduledTime.setMinutes(scheduledTime.getMinutes() - LATE_THRESHOLD_MINUTES)
 
   // Calculate difference in minutes
+  // positive = scheduled is future (early)
+  // negative = scheduled is past (late)
   const diffMinutes = (scheduledTime.getTime() - checkInAt.getTime()) / (1000 * 60)
+
+  // Debug log
+  console.log('Status Debug:', {
+    checkInAt: checkInAt.toISOString(),
+    scheduledTime: scheduledTime.toISOString(),
+    diffMinutes
+  })
 
   // If check-in is more than 2 hours (120 mins) before scheduled time
   if (diffMinutes > 120) {

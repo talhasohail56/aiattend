@@ -95,13 +95,15 @@ export default function AdminPage() {
   const [editTimeDialogOpen, setEditTimeDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [editTimes, setEditTimes] = useState({ checkInTime: '', checkOutTime: '' })
-  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null)
+
   const [filters, setFilters] = useState({
     userId: '',
     status: '',
     startDate: '',
     endDate: '',
-    const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null)
+  })
+
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null)
 
   // Password Management States
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
@@ -110,9 +112,7 @@ export default function AdminPage() {
   const [createdCredentials, setCreatedCredentials] = useState<{ email: string, password: string } | null>(null)
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false)
 
-  const [filters, setFilters] = useState({
-
-      useEffect(() => {
+  useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
       return

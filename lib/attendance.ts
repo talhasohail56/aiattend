@@ -139,29 +139,18 @@ export function getShiftStartTimestamp(shiftDateNaive: Date, checkInTimeStr: str
 /**
  * Get check-in deadline (check-in time + late threshold)
  */
+/**
+ * Get check-in deadline (check-in time + late threshold)
+ */
 export function getCheckInDeadline(
   shiftDate: Date,
   userCheckInTime?: string | null
 ): Date {
-  const checkInTime = getUserCheckInTime(userCheckInTime)
-  // shiftDate is the base "Day". We need "Day + Time" in Target Timezone.
-
-  const year = shiftDate.getFullYear()
-  const month = String(shiftDate.getMonth() + 1).padStart(2, '0')
-  const day = String(shiftDate.getDate()).padStart(2, '0')
-
-  // Hardcoded +05:00 for Asia/Karachi as Vercel/Node doesn't support easy TZ parsing without libs
-  // Ideally we match DEFAULT_TIMEZONE
-  // const offset = DEFAULT_TIMEZONE === 'Asia/Karachi' ? '+05:00' : 'Z'
-  const offset = '+05:00'
-
-  const scheduledIsoString = `${year}-${month}-${day}T${checkInTime}:00${offset}`
-  const deadlineBase = new Date(scheduledIsoString)
-
-  // Add threshold
-  deadlineBase.setMinutes(deadlineBase.getMinutes() + LATE_THRESHOLD_MINUTES)
-
-  return deadlineBase
+  // shiftDate is already the exact Shift Start Timestamp (in correct TZ) from getShiftDate
+  // We just need to add the threshold minutes.
+  const deadline = new Date(shiftDate)
+  deadline.setMinutes(deadline.getMinutes() + LATE_THRESHOLD_MINUTES)
+  return deadline
 }
 
 /**

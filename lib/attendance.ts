@@ -163,6 +163,8 @@ export function getAttendanceStatus(
   console.log('Status Debug:', {
     checkInAt: checkInAt.toISOString(),
     scheduledTime: scheduledTime.toISOString(),
+    deadline: deadline.toISOString(),
+    threshold: LATE_THRESHOLD_MINUTES,
     diffMinutes
   })
 

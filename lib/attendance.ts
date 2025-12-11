@@ -45,41 +45,67 @@ export function getShiftDate(
   userCheckInTime?: string | null,
   userCheckOutTime?: string | null
 ): Date {
-  const d = new Date(date)
   const checkInTime = getUserCheckInTime(userCheckInTime)
   const checkOutTime = getUserCheckOutTime(userCheckOutTime)
   const [checkInHours, checkInMinutes] = checkInTime.split(':').map(Number)
   const [checkOutHours, checkOutMinutes] = checkOutTime.split(':').map(Number)
 
-  // Determine if the shift implies an overnight stay (e.g. 21:00 to 05:00)
-  // If checkIn < checkOut (e.g. 09:00 to 17:00), it's a same-day shift
+  // 1. Get Current 'Wall Clock' Time in Target Timezone (PKT)
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: DEFAULT_TIMEZONE,
+    year: 'numeric',
+    month: 'numeric', // 1-12
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  })
+
+  // Format parts to reliable object
+  const parts = formatter.formatToParts(date)
+  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0'
+
+  let currentYear = parseInt(getPart('year'))
+  let currentMonth = parseInt(getPart('month')) // 1-12
+  let currentDay = parseInt(getPart('day'))
+  const currentHour = parseInt(getPart('hour') === '24' ? '0' : getPart('hour'))
+  const currentMinute = parseInt(getPart('minute'))
+
+  // 2. Determine Logic based on 'Wall Clock' time
   const isOvernight = checkInHours > checkOutHours || (checkInHours === checkOutHours && checkInMinutes > checkOutMinutes)
 
-  // Get current time in TARGET timezone
-  const { hour: currentHour, minute: currentMinute } = getPartsInTimezone(d)
+  let shiftYear = currentYear
+  let shiftMonth = currentMonth
+  let shiftDay = currentDay
 
   if (isOvernight) {
     if (currentHour < checkOutHours || (currentHour === checkOutHours && currentMinute < checkOutMinutes)) {
-      console.log('getShiftDate: Subtracting day', { date: d, checkOutHours, currentHour })
+      // It's early morning (e.g. 2am), but belongs to previous night's shift
+      // Subtract 1 day from the current PKT date
+      // We can use a Date object to handle month/year rollover easily
+      // Create a date at Noon (avoid DST issues) in local, subtract day, read back components
+      // Actually strictly:
+      const d = new Date(currentYear, currentMonth - 1, currentDay) // Month is 0-indexed
       d.setDate(d.getDate() - 1)
+      shiftYear = d.getFullYear()
+      shiftMonth = d.getMonth() + 1
+      shiftDay = d.getDate()
     }
-  } else {
-    // Debug strict logging to catch anomalies
-    // console.log('getShiftDate: Same day shift', { date: d, checkInHours, checkOutHours })
   }
-  // For same-day shifts (e.g. 9am start), we assume the shift is on the current day 
-  // unless we implement nuanced logic for "very late checkin next day" which is unlikely for same-day shifts.
 
-  // We need to return a Date object that represents the Shift Date ~at~ the Shift Start Time
-  // BUT the Date object itself stores a UTC timestamp.
-  // Converting "YYYY-MM-DD" + "HH:mm" + "Offset" is best.
-  // For now we keep the existing behavior: setHours creates a local date (UTC in Vercel), which might be "Wrong" absolutely but consistent locally.
-  // WAIT: If we return "23:00 UTC", but 23:00 PKT is expected...
-  // Let's rely on constructing the proper ISO string for the Route handler.
+  // 3. Construct Absolute Timestamp for the Shift Start
+  // Format: YYYY-MM-DDTHH:mm:00+05:00
+  const yyyy = shiftYear
+  const mm = String(shiftMonth).padStart(2, '0')
+  const dd = String(shiftDay).padStart(2, '0')
+  const hh = String(checkInHours).padStart(2, '0')
+  const min = String(checkInMinutes).padStart(2, '0')
 
-  // Reset H:M:S to shift start time (naive set)
-  d.setHours(checkInHours, checkInMinutes, 0, 0)
-  return d
+  // Hardcoded offset for robustness (env var DEFAULT_TIMEZONE is Asia/Karachi)
+  const offset = '+05:00'
+
+  const isoString = `${yyyy}-${mm}-${dd}T${hh}:${min}:00${offset}`
+  return new Date(isoString)
 }
 
 /**

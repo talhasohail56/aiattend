@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { createUser } from '@/lib/auth'
 import { UserRole, AttendanceStatus } from '@prisma/client'
+import { sendWelcomeEmail } from '@/lib/email'
 
 export async function GET(req: NextRequest) {
   try {
@@ -113,6 +114,15 @@ export async function POST(req: NextRequest) {
     }
 
     const user = await createUser(email, password, name, UserRole.EMPLOYEE)
+
+    // Send credentials via email
+    // We don't await this to prevent blocking the UI, or we can await to ensure it sent.
+    // Let's await to log errors if any, but not fail the request if email fails (soft fail).
+    try {
+      await sendWelcomeEmail(email, name, password)
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError)
+    }
 
     return NextResponse.json({ user: { id: user.id, name: user.name, email: user.email } })
   } catch (error) {

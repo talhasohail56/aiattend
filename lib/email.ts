@@ -115,3 +115,44 @@ export async function sendLateNotificationEmail(
         return null
     }
 }
+
+export async function sendWelcomeEmail(
+    email: string,
+    name: string,
+    password: string
+) {
+    if (!resend) {
+        console.warn('RESEND_API_KEY is missing. Skipping welcome email.')
+        return null
+    }
+
+    try {
+        const { data, error } = await resend.emails.send({
+            from: `Attendance System <${FROM_EMAIL}>`,
+            to: [email],
+            subject: 'Welcome to Attendance System - Your Credentials',
+            html: `
+        <h1>Welcome, ${name}!</h1>
+        <p>Your account has been created.</p>
+        <p>Here are your login credentials:</p>
+        <ul>
+            <li><strong>Email:</strong> ${email}</li>
+            <li><strong>Password:</strong> ${password}</li>
+        </ul>
+        <br>
+        <p>Please login and change your password if needed.</p>
+        <a href="${process.env.NEXTAUTH_URL || 'https://aiattend.vercel.app'}/login">Login Here</a>
+      `,
+        })
+
+        if (error) {
+            console.error('Email error:', error)
+            return null
+        }
+
+        return data
+    } catch (err) {
+        console.error('Email exception:', err)
+        return null
+    }
+}

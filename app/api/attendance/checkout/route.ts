@@ -69,7 +69,9 @@ export async function POST(req: NextRequest) {
     })
 
     // Calculate duration
-    const diffMs = now.getTime() - new Date(attendance.checkInAt).getTime()
+    // attendance.checkInAt is guaranteed by the query { checkInAt: { not: null } }
+    const checkInTime = attendance.checkInAt ? new Date(attendance.checkInAt).getTime() : now.getTime()
+    const diffMs = now.getTime() - checkInTime
     const diffHrs = Math.floor(diffMs / (1000 * 60 * 60))
     const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
     const duration = `${diffHrs}h ${diffMins}m`

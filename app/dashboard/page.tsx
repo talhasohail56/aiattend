@@ -114,7 +114,7 @@ export default function DashboardPage() {
       const statsData = {
         totalDays: historyData.attendances?.length || 0,
         present: historyData.attendances?.filter((a: Attendance) =>
-          a.status === 'ON_TIME' || a.status === 'LATE'
+          a.status === 'ON_TIME'
         ).length || 0,
         late: historyData.attendances?.filter((a: Attendance) =>
           a.status === 'LATE'

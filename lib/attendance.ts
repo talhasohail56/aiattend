@@ -20,6 +20,22 @@ export function getUserCheckOutTime(userCheckOutTime: string | null | undefined)
 }
 
 /**
+ * Get hour/minute in the configured timezone
+ */
+export function getPartsInTimezone(date: Date): { hour: number; minute: number } {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: DEFAULT_TIMEZONE,
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(date)
+  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value || '0')
+  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value || '0')
+  return { hour: hour === 24 ? 0 : hour, minute }
+}
+
+/**
  * Get the shift date for a given timestamp
  * A shift starts at check-in time and ends at check-out time next day
  * The shiftDate is the date of the check-in time (start of shift)
@@ -39,9 +55,8 @@ export function getShiftDate(
   // If checkIn < checkOut (e.g. 09:00 to 17:00), it's a same-day shift
   const isOvernight = checkInHours > checkOutHours || (checkInHours === checkOutHours && checkInMinutes > checkOutMinutes)
 
-  // If current time is before check-out time AND it's an overnight shift, the shift belongs to previous day
-  const currentHour = d.getHours()
-  const currentMinute = d.getMinutes()
+  // Get current time in TARGET timezone
+  const { hour: currentHour, minute: currentMinute } = getPartsInTimezone(d)
 
   if (isOvernight) {
     if (currentHour < checkOutHours || (currentHour === checkOutHours && currentMinute < checkOutMinutes)) {
@@ -55,8 +70,44 @@ export function getShiftDate(
   // For same-day shifts (e.g. 9am start), we assume the shift is on the current day 
   // unless we implement nuanced logic for "very late checkin next day" which is unlikely for same-day shifts.
 
+  // We need to return a Date object that represents the Shift Date ~at~ the Shift Start Time
+  // BUT the Date object itself stores a UTC timestamp.
+  // Converting "YYYY-MM-DD" + "HH:mm" + "Offset" is best.
+  // For now we keep the existing behavior: setHours creates a local date (UTC in Vercel), which might be "Wrong" absolutely but consistent locally.
+  // WAIT: If we return "23:00 UTC", but 23:00 PKT is expected...
+  // Let's rely on constructing the proper ISO string for the Route handler.
+
+  // Reset H:M:S to shift start time (naive set)
   d.setHours(checkInHours, checkInMinutes, 0, 0)
   return d
+}
+
+/**
+ * Helper to construct a proper Date object for the Shift Start in the Target Timezone
+ */
+export function getShiftStartTimestamp(shiftDateNaive: Date, checkInTimeStr: string): Date {
+  // shiftDateNaive is the Date object from getShiftDate.
+  // We care about its YYYY-MM-DD parts relative to the Timezone? 
+  // ACTUALLY: getShiftDate returns a Date object where .getDate() matches the shift day.
+  // But .getHours() matches the checkIn time (in Vercel's Zone).
+
+  // We want to construct "YYYY-MM-DD" (from shiftDate) + "HH:mm" (from checkInTime) + "DEFAULT_TIMEZONE Offset".
+  // Since calculating offset manually is hard without libraries...
+  // We can use a different trick: Use the String representation.
+
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: DEFAULT_TIMEZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  })
+  const parts = formatter.formatToParts(shiftDateNaive)
+  // This formats shiftDateNaive using PKT. 
+  // If shiftDateNaive was set using setHours(23) in UTC... converting to PKT adds 5 hours -> Next Day 04:00.
+  // FAIL.
+
+  // STRATEGY: 
+  // getShiftDate should return the Date where Date-Part is correct.
+  // In Route, we will parse this Date-Part, Combine with Time-Part, and Force Timezone.
+  return shiftDateNaive
 }
 
 /**

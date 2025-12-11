@@ -26,16 +26,49 @@ export async function POST(req: NextRequest) {
     const shiftDate = getShiftDate(now, user?.checkInTime, user?.checkOutTime)
 
     // strict check: Allow max 1 hour early
-    const checkInTimeStr = user?.checkInTime || '21:00' // fallback to default if not found, but usually exists
-    const [scheduledHours, scheduledMinutes] = checkInTimeStr.split(':').map(Number)
+    const checkInTimeStr = user?.checkInTime || '21:00' // fallback to default if not found
 
-    // Construct scheduled Check-In Time for this shift
-    const scheduledCheckIn = new Date(shiftDate)
-    scheduledCheckIn.setHours(scheduledHours, scheduledMinutes, 0, 0)
+    // We need to compare NOW with SCHEDULED_TIME
+    // NOW and SCHEDULED_TIME must both be absolute timestamps.
+    // SCHEDULED_TIME = (ShiftDate YYYY-MM-DD) + (CheckInTime HH:mm) + (PKT Offset)
+
+    // 1. Get Shift Date YYYY-MM-DD (This is essentially correct from getShiftDate logic, as it subtracts day if needed)
+    // However, d.setHours() in getShiftDate might set UTC hours. 
+    // Let's rely on shiftDate.toISOString() date part? No, that's UTC date part.
+    // We need the "Wall Clock Date".
+
+    // Construct Scheduled Time robustly:
+    // Create a string "YYYY-MM-DDTHH:mm:00+05:00" assuming PKT (Standard)
+    // Or just use the native date methods shifted.
+
+    // Hacky but robust for Vercel/PKT pair:
+    // shiftDate is the "Start Date". 
+    // If shiftDate (from getShiftDate) says "Dec 11" (in UTC representation), it means the shift implies Dec 11.
+    const year = shiftDate.getFullYear()
+    const month = String(shiftDate.getMonth() + 1).padStart(2, '0')
+    const day = String(shiftDate.getDate()).padStart(2, '0') // This is UTC Day.
+    // If getShiftDate ran on Vercel (UTC), and it said "Dec 11", it used UTC 'now'.
+    // If 'now' was 18:00 UTC (Dec 11), shiftDate is Dec 11.
+    // We want "Dec 11 23:00 PKT".
+    // 23:00 PKT is 18:00 UTC.
+    // "2025-12-11T23:00:00+05:00"
+
+    const scheduledIsoString = `${year}-${month}-${day}T${checkInTimeStr}:00+05:00`
+    // Note: This +05:00 hardcoding is risky if DEFAULT_TIMEZONE changes, 
+    // but without a heavy library, parsing "Asia/Karachi" to offset is hard.
+    // Since env DEFAULT_TIMEZONE is Asia/Karachi, we assume +05:00.
+
+    const scheduledCheckIn = new Date(scheduledIsoString)
 
     // Calculate difference in minutes (scheduled - now)
-    // If now is 19:00 and scheduled is 21:00, diff is 120 mins
     const diffMinutes = (scheduledCheckIn.getTime() - now.getTime()) / (1000 * 60)
+
+    console.log('CheckIn Debug:', {
+      now: now.toISOString(),
+      scheduledIsoString,
+      scheduledCheckIn: scheduledCheckIn.toISOString(),
+      diffMinutes
+    })
 
     // If trying to check in more than 60 minutes early
     if (diffMinutes > 60) {

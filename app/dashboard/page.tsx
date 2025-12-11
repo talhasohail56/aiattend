@@ -62,37 +62,75 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const updateTimer = () => {
-      if (!userTimes.checkInTime) return
+      if (!userTimes.checkInTime || currentAttendance?.checkInAt) {
+        setTimeLeft(null)
+        return
+      }
 
       const now = new Date()
-      const [hours, minutes] = userTimes.checkInTime.split(':').map(Number)
-      const checkInTime = new Date()
-      checkInTime.setHours(hours, minutes, 0, 0)
+      const [inHours, inMinutes] = userTimes.checkInTime.split(':').map(Number)
+      const [outHours, outMinutes] = userTimes.checkOutTime.split(':').map(Number)
 
-      // If check-in time is earlier today (e.g. 5:00 PM and it's 8:00 AM), user probably means today.
-      // But if it's 9:00 PM and it's 10:00 PM, user missed it.
-      // Let's assume scheduling for "upcoming" check-in today.
+      const checkInDate = new Date()
+      checkInDate.setHours(inHours, inMinutes, 0, 0)
 
-      // Adjust for next day if checkInTime is already passed extensively? 
-      // For now simple logic: Timer counts down to the specific time today.
+      const checkOutDate = new Date()
+      checkOutDate.setHours(outHours, outMinutes, 0, 0)
 
-      const diff = checkInTime.getTime() - now.getTime()
+      // Handle overnight shift logic for "Am I in the shift?"
+      // Shift: 21:00 to 05:00. Now: 02:00.
 
-      if (diff > 0 && diff < 1000 * 60 * 60 * 24) { // Within 24 hours
-        const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-        const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
-        const s = Math.floor((diff % (1000 * 60)) / 1000)
-        setTimeLeft(`${h}h ${m}m ${s}s`)
+      const isOvernight = inHours > outHours || (inHours === outHours && inMinutes > outMinutes)
+      let isActiveShift = false
+
+      const currentH = now.getHours()
+      const currentM = now.getMinutes()
+
+      if (isOvernight) {
+        // Active if: (Now >= CheckIn) OR (Now < CheckOut)
+        // e.g. Start 21:00, End 05:00.
+        // Now 23:00 -> Active. Now 04:00 -> Active. Now 06:00 -> Not active. Now 12:00 -> Not active.
+        if ((currentH > inHours || (currentH === inHours && currentM >= inMinutes)) ||
+          (currentH < outHours || (currentH === outHours && currentM < outMinutes))) {
+          isActiveShift = true
+        }
       } else {
-        setTimeLeft(null)
+        // Standard day shift: 09:00 to 17:00
+        // Active if: Now >= CheckIn AND Now < CheckOut
+        if ((currentH > inHours || (currentH === inHours && currentM >= inMinutes)) &&
+          (currentH < outHours || (currentH === outHours && currentM < outMinutes))) {
+          isActiveShift = true
+        }
       }
+
+      if (isActiveShift) {
+        setTimeLeft('SHIFT_ACTIVE')
+        return
+      }
+
+      // If not active, count down to NEXT check-in
+      // If now is 02:00 and checkin is 21:00 -> Diff is positive.
+      // If now is 22:00 and checkin is 21:00 -> Diff is negative (but handled by active check above? No, 22:00 is active)
+      // What if shift ends at 17:00 and now is 18:00. Next checkin is tomorrow 09:00.
+
+      let targetTime = new Date(checkInDate)
+      if (targetTime.getTime() < now.getTime()) {
+        // Scheduled time passed today (and we are not in active shift), so look to tomorrow
+        targetTime.setDate(targetTime.getDate() + 1)
+      }
+
+      const diff = targetTime.getTime() - now.getTime()
+
+      const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
+      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+      const s = Math.floor((diff % (1000 * 60)) / 1000)
+      setTimeLeft(`${h}h ${m}m ${s}s`)
     }
 
-    // Update immediately and then every second
     updateTimer()
     const interval = setInterval(updateTimer, 1000)
     return () => clearInterval(interval)
-  }, [userTimes])
+  }, [userTimes, currentAttendance])
 
   const loadData = async () => {
     try {
@@ -303,15 +341,31 @@ export default function DashboardPage() {
             <CardContent className="p-8 relative z-10 flex flex-col justify-center h-full min-h-[250px]">
               {!currentAttendance?.checkInAt && timeLeft ? (
                 <div className="text-center space-y-4">
-                  <Badge variant="outline" className="border-neutral-700 text-neutral-400 bg-neutral-800/50 py-1 px-3">
-                    Upcoming Shift
-                  </Badge>
-                  <div className="space-y-1">
-                    <h2 className="text-5xl font-bold text-white tracking-tight tabular-nums">
-                      {timeLeft}
-                    </h2>
-                    <p className="text-neutral-500">left until check-in at {userTimes.checkInTime}</p>
-                  </div>
+                  {timeLeft === 'SHIFT_ACTIVE' ? (
+                    <>
+                      <Badge variant="outline" className="border-amber-700 text-amber-500 bg-amber-950/50 py-1 px-3 animate-pulse">
+                        Shift In Progress
+                      </Badge>
+                      <div className="space-y-1">
+                        <h2 className="text-4xl font-bold text-white tracking-tight">
+                          You are Late
+                        </h2>
+                        <p className="text-neutral-500">Your shift started at {userTimes.checkInTime}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="outline" className="border-neutral-700 text-neutral-400 bg-neutral-800/50 py-1 px-3">
+                        Upcoming Shift
+                      </Badge>
+                      <div className="space-y-1">
+                        <h2 className="text-5xl font-bold text-white tracking-tight tabular-nums">
+                          {timeLeft}
+                        </h2>
+                        <p className="text-neutral-500">left until check-in at {userTimes.checkInTime}</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">

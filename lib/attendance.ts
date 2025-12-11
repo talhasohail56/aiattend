@@ -35,12 +35,25 @@ export function getShiftDate(
   const [checkInHours, checkInMinutes] = checkInTime.split(':').map(Number)
   const [checkOutHours, checkOutMinutes] = checkOutTime.split(':').map(Number)
 
-  // If current time is before check-out time, the shift belongs to previous day
+  // Determine if the shift implies an overnight stay (e.g. 21:00 to 05:00)
+  // If checkIn < checkOut (e.g. 09:00 to 17:00), it's a same-day shift
+  const isOvernight = checkInHours > checkOutHours || (checkInHours === checkOutHours && checkInMinutes > checkOutMinutes)
+
+  // If current time is before check-out time AND it's an overnight shift, the shift belongs to previous day
   const currentHour = d.getHours()
   const currentMinute = d.getMinutes()
-  if (currentHour < checkOutHours || (currentHour === checkOutHours && currentMinute < checkOutMinutes)) {
-    d.setDate(d.getDate() - 1)
+
+  if (isOvernight) {
+    if (currentHour < checkOutHours || (currentHour === checkOutHours && currentMinute < checkOutMinutes)) {
+      console.log('getShiftDate: Subtracting day', { date: d, checkOutHours, currentHour })
+      d.setDate(d.getDate() - 1)
+    }
+  } else {
+    // Debug strict logging to catch anomalies
+    // console.log('getShiftDate: Same day shift', { date: d, checkInHours, checkOutHours })
   }
+  // For same-day shifts (e.g. 9am start), we assume the shift is on the current day 
+  // unless we implement nuanced logic for "very late checkin next day" which is unlikely for same-day shifts.
 
   d.setHours(checkInHours, checkInMinutes, 0, 0)
   return d

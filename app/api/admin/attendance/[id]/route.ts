@@ -63,4 +63,29 @@ export async function PUT(
   }
 }
 
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  console.log('DELETE Attendance request received for ID:', params.id)
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    await prisma.attendance.delete({
+      where: { id: params.id },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Delete attendance error:', error)
+    return NextResponse.json(
+      { error: 'Failed to delete attendance' },
+      { status: 500 }
+    )
+  }
+}
+
 

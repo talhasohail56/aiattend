@@ -189,6 +189,24 @@ export default function AdminPage() {
     }
   }
 
+  const handleDeleteAttendance = async (attendanceId: string) => {
+    if (!confirm('Are you sure you want to delete this attendance record?')) return
+
+    try {
+      const response = await fetch(`/api/admin/attendance/${attendanceId}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete attendance')
+      }
+
+      loadData()
+    } catch (error: any) {
+      alert(error.message || 'Failed to delete attendance')
+    }
+  }
+
   const handleExport = () => {
     const params = new URLSearchParams({
       ...(filters.userId && { userId: filters.userId }),
@@ -760,14 +778,24 @@ export default function AdminPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/admin/attendance/${attendance.id}`)}
-                            className="border-white/20 text-white hover:bg-white/10"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/admin/attendance/${attendance.id}`)}
+                              className="border-white/20 text-white hover:bg-white/10"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteAttendance(attendance.id)}
+                              className="border-red-500/30 text-red-500 hover:bg-red-500/10 hover:border-red-500/50"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -788,18 +816,15 @@ export default function AdminPage() {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="checkInTime" className="text-white">Check-In Time (HH:mm)</Label>
-                <Input
-                  id="checkInTime"
-                  type="time"
-                  value={editTimes.checkInTime}
-                  onChange={(e) => setEditTimes({ ...editTimes, checkInTime: e.target.value })}
-                  placeholder="21:00"
-                  className="bg-white/5 border-white/10 text-white"
-                />
-                <p className="text-xs text-white/30">Default: 21:00 (9:00 PM)</p>
-              </div>
+              <Label htmlFor="checkInTime" className="text-white">Check-In Time (HH:mm)</Label>
+              <Input
+                id="checkInTime"
+                type="time"
+                value={editTimes.checkInTime}
+                onChange={(e) => setEditTimes({ ...editTimes, checkInTime: e.target.value })}
+                placeholder="21:00"
+                className="bg-white/5 border-white/10 text-white"
+              />
               <div className="space-y-2">
                 <Label htmlFor="checkOutTime" className="text-white">Check-Out Time (HH:mm)</Label>
                 <Input

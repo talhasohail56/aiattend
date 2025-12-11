@@ -16,35 +16,40 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { latitude, longitude } = body
 
-    // Get user with their specific check-in/check-out times
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { checkInTime: true, checkOutTime: true },
-    })
+    // Enforce location
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+      return NextResponse.json(
+        { error: 'Location access is required to check out. Please enable location services.' },
+        { status: 400 }
+      )
+    }
 
     const now = new Date()
-    const shiftDate = getShiftDate(now, user?.checkInTime, user?.checkOutTime)
 
-    // Find the attendance record
-    const attendance = await prisma.attendance.findUnique({
+    // Find the latest OPEN attendance record (CheckIn not null, CheckOut null)
+    // We order by createdAt desc to get the most recent one.
+    const attendance = await prisma.attendance.findFirst({
       where: {
-        userId_shiftDate: {
-          userId: session.user.id,
-          shiftDate,
-        },
+        userId: session.user.id,
+        checkInAt: { not: null },
+        checkOutAt: null,
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     })
 
-    if (!attendance || !attendance.checkInAt) {
+    if (!attendance) {
       return NextResponse.json(
-        { error: 'No check-in found for this shift' },
+        { error: 'No active shift found to check out from.' },
         { status: 400 }
       )
     }
 
     if (attendance.checkOutAt) {
+      // Should be unreachable due to query, but safe check
       return NextResponse.json(
-        { error: 'Already checked out for this shift' },
+        { error: 'Already checked out.' },
         { status: 400 }
       )
     }
@@ -58,10 +63,8 @@ export async function POST(req: NextRequest) {
         checkOutAt: now,
         checkOutLatitude: latitude || null,
         checkOutLongitude: longitude || null,
-        // Update status if it was NO_CHECKOUT
-        status: attendance.status === AttendanceStatus.NO_CHECKOUT
-          ? AttendanceStatus.ON_TIME
-          : attendance.status,
+        // Update status if it was NO_CHECKOUT (though usually status is set at CheckIn)
+        // If we want to mark "Completed", we leave status as is (late/ontime)
       },
     })
 

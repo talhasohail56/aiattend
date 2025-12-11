@@ -200,7 +200,9 @@ export default function DashboardPage() {
         const loc = await getLocation()
         location = loc
       } catch (error) {
-        setLocationError('Location access denied. Check-out proceeding without location.')
+        setLocationError('Location access is mandatory. Please enable it in your browser settings.')
+        setCheckingOut(false)
+        return
       }
 
       const response = await fetch('/api/attendance/checkout', {

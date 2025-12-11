@@ -16,6 +16,14 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { latitude, longitude } = body
 
+    // Enforce location
+    if (latitude === null || latitude === undefined || longitude === null || longitude === undefined) {
+      return NextResponse.json(
+        { error: 'Location access is required to check in. Please enable location services.' },
+        { status: 400 }
+      )
+    }
+
     // Get user with their specific check-in/check-out times
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },

@@ -3,7 +3,7 @@ import { AttendanceStatus } from '@prisma/client'
 export const DEFAULT_TIMEZONE = process.env.DEFAULT_TIMEZONE || 'Asia/Karachi'
 export const CHECK_IN_TIME = process.env.CHECK_IN_TIME || '21:00'
 export const CHECK_OUT_TIME = process.env.CHECK_OUT_TIME || '05:00'
-export const LATE_THRESHOLD_MINUTES = parseInt(process.env.LATE_THRESHOLD_MINUTES || '15')
+export const LATE_THRESHOLD_MINUTES = parseInt(process.env.LATE_THRESHOLD_MINUTES || '10')
 
 /**
  * Get check-in time for a user (uses user-specific or default)

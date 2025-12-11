@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
+import { hashPassword } from '@/lib/auth'
 
 export async function PUT(
   req: NextRequest,
@@ -14,7 +15,7 @@ export async function PUT(
     }
 
     const body = await req.json()
-    const { checkInTime, checkOutTime } = body
+    const { checkInTime, checkOutTime, password } = body
 
     // Validate time format (HH:mm)
     const timeRegex = /^([0-1][0-9]|2[0-3]):[0-5][0-9]$/
@@ -31,12 +32,18 @@ export async function PUT(
       )
     }
 
+    const data: any = {
+      checkInTime: checkInTime || null,
+      checkOutTime: checkOutTime || null,
+    }
+
+    if (password) {
+      data.passwordHash = await hashPassword(password)
+    }
+
     const user = await prisma.user.update({
       where: { id: params.id },
-      data: {
-        checkInTime: checkInTime || null,
-        checkOutTime: checkOutTime || null,
-      },
+      data,
       select: {
         id: true,
         name: true,

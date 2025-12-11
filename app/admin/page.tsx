@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { formatDate, formatTime } from '@/lib/attendance'
 import { getGoogleMapsLink } from '@/lib/location'
-import { MapPin, LogOut, Users, TrendingUp, Download, Plus, Edit, Trash2, AlertTriangle, CheckCircle, Clock, XCircle, BarChart3, PieChart } from 'lucide-react'
+import { MapPin, LogOut, Users, TrendingUp, Download, Plus, Edit, Trash2, AlertTriangle, CheckCircle, Clock, XCircle, BarChart3, PieChart, Key, Copy, Eye, EyeOff } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart as RechartsPieChart, Pie, Cell, Legend } from 'recharts'
 
 interface EmployeeStats {
@@ -101,9 +101,18 @@ export default function AdminPage() {
     status: '',
     startDate: '',
     endDate: '',
-  })
+    const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null)
 
-  useEffect(() => {
+  // Password Management States
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [passwordEmployee, setPasswordEmployee] = useState<Employee | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [createdCredentials, setCreatedCredentials] = useState<{ email: string, password: string } | null>(null)
+  const [showCredentialsDialog, setShowCredentialsDialog] = useState(false)
+
+  const [filters, setFilters] = useState({
+
+      useEffect(() => {
     if (status === 'unauthenticated') {
       router.push('/login')
       return
@@ -150,6 +159,30 @@ export default function AdminPage() {
     }
   }, [filters])
 
+  const handleChangePassword = async () => {
+    if (!passwordEmployee || !newPassword) return
+
+    try {
+      const response = await fetch(`/api/admin/employees/${passwordEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: newPassword })
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to update password')
+      }
+
+      setChangePasswordOpen(false)
+      setPasswordEmployee(null)
+      setNewPassword('')
+      alert('Password updated successfully')
+    } catch (error: any) {
+      alert(error.message || 'Failed to update password')
+    }
+  }
+
   const handleCreateEmployee = async () => {
     try {
       const response = await fetch('/api/admin/employees', {
@@ -164,6 +197,14 @@ export default function AdminPage() {
       }
 
       setCreateDialogOpen(false)
+
+      // Save credentials to show popup
+      setCreatedCredentials({
+        email: newEmployee.email,
+        password: newEmployee.password
+      })
+      setShowCredentialsDialog(true)
+
       setNewEmployee({ name: '', email: '', password: '' })
       loadData()
     } catch (error: any) {
@@ -604,6 +645,18 @@ export default function AdminPage() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setPasswordEmployee(employee)
+                                setChangePasswordOpen(true)
+                              }}
+                              className="bg-neutral-800 border-neutral-700 text-amber-500 hover:bg-neutral-700 hover:text-amber-400"
+                              title="Change Password"
+                            >
+                              <Key className="h-4 w-4" />
+                            </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
@@ -638,6 +691,81 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Change Password Dialog */}
+        <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
+          <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+            <DialogHeader>
+              <DialogTitle>Change Password</DialogTitle>
+              <DialogDescription className="text-neutral-500">
+                Set a new password for <span className="text-white font-medium">{passwordEmployee?.name}</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <Label className="text-neutral-200 mb-2 block">New Password</Label>
+              <Input
+                type="texxt"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="bg-neutral-950 border-neutral-800 text-neutral-200"
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setChangePasswordOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800">
+                Cancel
+              </Button>
+              <Button onClick={handleChangePassword} className="bg-white text-black hover:bg-neutral-200">
+                Update Password
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Created Credentials Popup */}
+        <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
+          <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-emerald-400">
+                <CheckCircle className="h-5 w-5" />
+                Employee Created!
+              </DialogTitle>
+              <DialogDescription className="text-neutral-500">
+                Copy these credentials and send them to the employee.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-6 space-y-4">
+              <div className="bg-black/50 p-4 rounded-lg border border-neutral-800 space-y-3">
+                <div>
+                  <Label className="text-xs text-neutral-500 uppercase tracking-wider">Email</Label>
+                  <div className="flex justify-between items-center mt-1">
+                    <code className="text-lg text-emerald-400 font-mono">{createdCredentials?.email}</code>
+                    <Button size="icon" variant="ghost" className="h-6 w-6 text-neutral-500 hover:text-white" onClick={() => navigator.clipboard.writeText(createdCredentials?.email || '')}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+                <div className="border-t border-neutral-800 pt-3">
+                  <Label className="text-xs text-neutral-500 uppercase tracking-wider">Password</Label>
+                  <div className="flex justify-between items-center mt-1">
+                    <code className="text-lg text-emerald-400 font-mono">{createdCredentials?.password}</code>
+                    <Button size="icon" variant="ghost" className="h-6 w-6 text-neutral-500 hover:text-white" onClick={() => navigator.clipboard.writeText(createdCredentials?.password || '')}>
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-center text-neutral-500">
+                For security, this password will not be shown again.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowCredentialsDialog(false)} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white">
+                Done
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Filters */}
         <Card className="mb-8 bg-neutral-900/50 border-neutral-800 backdrop-blur-sm">

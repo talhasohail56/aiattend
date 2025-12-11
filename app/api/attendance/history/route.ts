@@ -47,9 +47,10 @@ export async function GET(req: NextRequest) {
     // We need to know the User's CheckIn Time to properly construct "Shift Dates" 
     // to match what is in the DB.
     // Fetch user settings
+    // Fetch user settings
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { checkInTime: true, checkOutTime: true }
+      select: { checkInTime: true, checkOutTime: true, createdAt: true }
     })
 
     // Helper to generate Shift Date string YYYY-MM-DD
@@ -59,6 +60,20 @@ export async function GET(req: NextRequest) {
     for (let i = 0; i < limit; i++) {
       const d = new Date()
       d.setDate(d.getDate() - i) // Today, Yesterday, ...
+
+      // Stop if we go before user creation (ignore time part for creation day safety)
+      // Actually, if created today, i=0 is valid. if created yesterday, i=0,1 valid.
+      // If d < createdAt (normalized), break or skip.
+
+      if (user?.createdAt) {
+        const created = new Date(user.createdAt)
+        created.setHours(0, 0, 0, 0) // Start of created day
+
+        const currentDay = new Date(d)
+        currentDay.setHours(0, 0, 0, 0)
+
+        if (currentDay < created) break; // Don't show history before creation
+      }
 
       // We need the "Shift Date" corresponding to this wall-clock day.
       // If we use our helper getShiftDate(d, ...):

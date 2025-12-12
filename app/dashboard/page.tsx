@@ -8,8 +8,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatTime, formatDateTime } from '@/lib/attendance'
-import { MapPin, LogOut, TrendingUp, Clock, XCircle, AlertCircle, CheckCircle, Timer } from 'lucide-react'
+import { MapPin, LogOut, TrendingUp, Clock, XCircle, AlertCircle, CheckCircle, Timer, CalendarClock } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 interface Attendance {
   id: string
@@ -45,6 +49,12 @@ export default function DashboardPage() {
     noCheckout: 0,
   })
   const [userTimes, setUserTimes] = useState({ checkInTime: '21:00', checkOutTime: '05:00' })
+
+  // Late Request
+  const [requestOpen, setRequestOpen] = useState(false)
+  const [requestDate, setRequestDate] = useState('')
+  const [requestTime, setRequestTime] = useState('')
+  const [requestReason, setRequestReason] = useState('')
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -262,6 +272,32 @@ export default function DashboardPage() {
     }
   }
 
+  const handleLateRequest = async () => {
+    if (!requestDate || !requestTime || !requestReason) return
+
+    try {
+      const response = await fetch('/api/attendance/request-late', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shiftDate: requestDate,
+          requestedTime: requestTime,
+          reason: requestReason
+        })
+      })
+
+      if (!response.ok) throw new Error('Failed to submit request')
+
+      setRequestOpen(false)
+      setRequestDate('')
+      setRequestTime('')
+      setRequestReason('')
+      alert('Request submitted! Admin will be notified.')
+    } catch (error) {
+      alert('Failed to submit request')
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'EARLY':
@@ -311,6 +347,18 @@ export default function DashboardPage() {
             </div>
           </div>
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setRequestDate(new Date().toISOString().split('T')[0])
+                setRequestOpen(true)
+              }}
+              className="border-neutral-700 bg-transparent text-neutral-400 hover:bg-neutral-800 hover:text-white transition-colors"
+            >
+              <CalendarClock className="h-4 w-4 mr-2" />
+              Request Late
+            </Button>
             <div className="flex flex-col items-end">
               <span className="text-sm font-medium text-neutral-200">
                 {session?.user?.name}
@@ -562,5 +610,51 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+
+      {/* Late Request Dialog */ }
+  <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+    <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+      <DialogHeader>
+        <DialogTitle>Request Late Arrival</DialogTitle>
+        <DialogDescription className="text-neutral-500">
+          Notify admin that you will be late. If approved, your schedule will be adjusted.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="py-4 space-y-4">
+        <div className="space-y-2">
+          <Label className="text-neutral-200">Date</Label>
+          <Input
+            type="date"
+            value={requestDate}
+            onChange={(e) => setRequestDate(e.target.value)}
+            className="bg-neutral-950 border-neutral-800 text-neutral-200"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-neutral-200">Expected Arrival Time</Label>
+          <Input
+            type="time"
+            value={requestTime}
+            onChange={(e) => setRequestTime(e.target.value)}
+            className="bg-neutral-950 border-neutral-800 text-neutral-200"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-neutral-200">Reason</Label>
+          <Textarea
+            value={requestReason}
+            onChange={(e) => setRequestReason(e.target.value)}
+            placeholder="Why are you late?"
+            className="bg-neutral-950 border-neutral-800 text-neutral-200"
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setRequestOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800">Cancel</Button>
+        <Button onClick={handleLateRequest} className="bg-blue-600 hover:bg-blue-700 text-white">Submit Request</Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+    </div >
   )
 }

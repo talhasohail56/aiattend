@@ -286,7 +286,10 @@ export default function DashboardPage() {
         })
       })
 
-      if (!response.ok) throw new Error('Failed to submit request')
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to submit request')
+      }
 
       setRequestOpen(false)
       setRequestDate('')

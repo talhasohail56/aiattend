@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -363,9 +364,18 @@ export default function AdminPage() {
       {/* Header */}
       <div className="border-b border-neutral-800 bg-neutral-900/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+          {/* Add import at top manually if needed or via multi_replace later if strict */}
+          {/* Just replacing content here. */}
+
           <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="h-10 w-10 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center shadow-lg">
-              <BarChart3 className="h-5 w-5 text-neutral-200" />
+            <div className="relative w-10 h-10">
+              <Image
+                src="/icon.png"
+                alt="Logo"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
             <div>
               <h1 className="text-xl font-bold text-neutral-100">Admin Dashboard</h1>

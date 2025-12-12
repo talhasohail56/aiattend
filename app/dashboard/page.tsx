@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Image from 'next/image'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -340,10 +341,17 @@ export default function DashboardPage() {
       {/* Header */}
       <div className="border-b border-neutral-800 bg-neutral-900/50 backdrop-blur-xl sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="flex items-center gap-3 w-full md:w-auto">
-            <div className="h-10 w-10 rounded-xl bg-neutral-800 border border-neutral-700 flex items-center justify-center shadow-lg">
-              <Clock className="h-5 w-5 text-neutral-200" />
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10">
+              <Image
+                src="/icon.png"
+                alt="Logo"
+                fill
+                className="object-contain"
+                priority
+              />
             </div>
+            <span className="font-bold text-xl tracking-tight text-white hidden md:inline-block">My Attendance</span>
             <div>
               <h1 className="text-xl font-bold text-neutral-100">My Attendance</h1>
               <p className="text-xs text-neutral-500">Employee Dashboard</p>
@@ -616,45 +624,66 @@ export default function DashboardPage() {
 
       {/* Late Request Dialog */}
       <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-        <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
-          <DialogHeader>
-            <DialogTitle>Request Late Arrival</DialogTitle>
-            <DialogDescription className="text-neutral-500">
-              Notify admin that you will be late. If approved, your schedule will be adjusted.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
+        <DialogContent className="bg-neutral-900/95 backdrop-blur-xl border-neutral-800 text-neutral-200 sm:max-w-[500px] w-[95vw] rounded-3xl shadow-2xl p-0 gap-0 overflow-hidden">
+          <div className="bg-gradient-to-b from-white/5 to-transparent px-6 py-6 sm:px-8 sm:py-8 border-b border-white/5">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">Request Late Arrival</DialogTitle>
+              <DialogDescription className="text-neutral-500 text-base mt-2">
+                Running behind schedule? Let the admin know to update your shift.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-6 sm:p-8 space-y-6">
             <div className="space-y-2">
-              <Label className="text-neutral-200">Date</Label>
-              <Input
-                type="date"
-                value={requestDate}
-                onChange={(e) => setRequestDate(e.target.value)}
-                className="bg-neutral-950 border-neutral-800 text-neutral-200"
-              />
+              <Label className="text-sm font-medium text-neutral-300">Date</Label>
+              <div className="relative">
+                <Input
+                  type="date"
+                  value={requestDate}
+                  onChange={(e) => setRequestDate(e.target.value)}
+                  className="bg-neutral-800/50 border-neutral-700 text-neutral-200 focus:ring-purple-500/50 focus:border-purple-500 h-11 rounded-xl transition-all"
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label className="text-neutral-200">Expected Arrival Time</Label>
-              <Input
-                type="time"
-                value={requestTime}
-                onChange={(e) => setRequestTime(e.target.value)}
-                className="bg-neutral-950 border-neutral-800 text-neutral-200"
-              />
+              <Label className="text-sm font-medium text-neutral-300">Expected Arrival Time</Label>
+              <div className="relative">
+                <Input
+                  type="time"
+                  value={requestTime}
+                  onChange={(e) => setRequestTime(e.target.value)}
+                  className="bg-neutral-800/50 border-neutral-700 text-neutral-200 focus:ring-purple-500/50 focus:border-purple-500 h-11 rounded-xl transition-all"
+                />
+              </div>
             </div>
+
             <div className="space-y-2">
-              <Label className="text-neutral-200">Reason</Label>
+              <Label className="text-sm font-medium text-neutral-300">Reason</Label>
               <Textarea
                 value={requestReason}
                 onChange={(e) => setRequestReason(e.target.value)}
-                placeholder="Why are you late?"
-                className="bg-neutral-950 border-neutral-800 text-neutral-200"
+                placeholder="Briefly explain why you are late..."
+                className="bg-neutral-800/50 border-neutral-700 text-neutral-200 focus:ring-purple-500/50 focus:border-purple-500 min-h-[100px] rounded-xl resize-none transition-all placeholder:text-neutral-600"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRequestOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800">Cancel</Button>
-            <Button onClick={handleLateRequest} className="bg-blue-600 hover:bg-blue-700 text-white">Submit Request</Button>
+
+          <DialogFooter className="bg-neutral-900/50 p-6 sm:p-8 pt-2 sm:pt-2 flex-col-reverse sm:flex-row gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setRequestOpen(false)}
+              className="w-full sm:w-auto border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-200 h-11 rounded-xl transition-colors"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLateRequest}
+              className="w-full sm:w-auto bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium h-11 rounded-xl shadow-lg shadow-purple-900/20 transition-all active:scale-[0.98]"
+            >
+              Submit Request
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

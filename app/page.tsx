@@ -1,6 +1,7 @@
 
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowRight, CheckCircle2, ShieldCheck, Zap } from 'lucide-react'
@@ -21,20 +22,31 @@ export default function HomePage() {
       <div className="container mx-auto px-4 py-8 relative z-10 flex flex-col items-center justify-center min-h-screen">
 
         {/* Navigation / Header */}
-        <nav className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-center z-50">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 bg-white rounded-lg flex items-center justify-center">
-              <div className="h-4 w-4 bg-neutral-950 rounded-full" />
+        <header className="fixed top-0 w-full border-b border-white/5 bg-black/50 backdrop-blur-xl z-50">
+          <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="relative w-8 h-8">
+                <Image
+                  src="/icon.png"
+                  alt="Logo"
+                  fill
+                  className="object-contain"
+                  priority
+                />
+              </div>
+              <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-500">
+                AI Attend
+              </span>
             </div>
-            <span className="font-bold text-xl tracking-tight text-white">Attend<span className="text-neutral-500">AI</span></span>
+            <nav className="flex items-center gap-4">
+              <Link href="/login">
+                <Button size="sm" className="bg-white text-black hover:bg-neutral-200 transition-colors">
+                  Employee Login
+                </Button>
+              </Link>
+            </nav>
           </div>
-          <Link href="/login">
-            <Button variant="outline" className="border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-900 hover:border-neutral-700 transition-all duration-300">
-              Sign In
-            </Button>
-          </Link>
-        </nav>
-
+        </header>
         {/* Hero Section */}
         <div className="text-center max-w-4xl mx-auto mt-24 md:mt-0 animate-in fade-in slide-in-from-bottom-8 duration-1000 px-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-900/50 border border-neutral-800 text-neutral-400 text-sm mb-8 hover:border-neutral-700 transition-colors cursor-default">

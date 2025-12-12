@@ -53,8 +53,14 @@ export default function LoginPage() {
 
       <Card className="w-full max-w-md bg-neutral-900/50 border-neutral-800 backdrop-blur-xl relative z-10 shadow-2xl">
         <CardHeader className="space-y-2 text-center pb-8">
-          <div className="mx-auto w-12 h-12 rounded-xl bg-neutral-800 flex items-center justify-center mb-2 shadow-lg border border-neutral-700">
-            <UserCircle2 className="w-7 h-7 text-neutral-200" />
+          <div className="mx-auto relative w-12 h-12 mb-2">
+            <Image
+              src="/icon.png"
+              alt="Logo"
+              fill
+              className="object-contain"
+              priority
+            />
           </div>
           <CardTitle className="text-3xl font-bold text-white">
             Welcome Back

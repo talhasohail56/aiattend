@@ -226,10 +226,14 @@ export async function sendLateRequestDecisionEmail(
     reason?: string
 ) {
     // We use Gmail here because Resend Free Tier forbids sending to unverified emails (employees)
+    console.log('[EmailDebug] Attempting to send decision email...')
+
     if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-        console.warn('GMAIL credentials missing. Skipping decision email.')
+        console.error('[EmailDebug] FAILED: GMAIL credentials missing in environment variables.')
         return null
     }
+
+    console.log(`[EmailDebug] Using Gmail User: ${process.env.GMAIL_USER}`)
 
     const isApproved = status === 'APPROVED'
     const color = isApproved ? '#10b981' : '#ef4444' // Green or Red
@@ -253,9 +257,10 @@ export async function sendLateRequestDecisionEmail(
       `,
         })
 
+        console.log('[EmailDebug] Email sent successfully:', info.messageId)
         return info
     } catch (err) {
-        console.error('Gmail send error:', err)
+        console.error('[EmailDebug] Gmail send error:', err)
         return null
     }
 }

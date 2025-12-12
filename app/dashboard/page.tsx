@@ -677,7 +677,7 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="text-neutral-200 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-purple-400" />
-              Today's Tasks
+              Today&apos;s Tasks
             </CardTitle>
             <CardDescription className="text-neutral-500">
               Complete all tasks to check out.

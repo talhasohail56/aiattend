@@ -34,6 +34,7 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   attendances  Attendance[]
+  shiftOverrides ShiftOverride[]
 }
 
 model Attendance {
@@ -51,8 +52,6 @@ model Attendance {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
-  @@index([userId])
-  @@index([shiftDate])
   @@index([userId])
   @@index([shiftDate])
   @@unique([userId, shiftDate])

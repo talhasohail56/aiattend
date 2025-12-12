@@ -63,16 +63,16 @@ export async function POST(req: NextRequest) {
     const endOfShift = new Date(attendance.shiftDate)
     endOfShift.setHours(23, 59, 59, 999)
 
-    const incompleteTasks = await prisma.task.count({
-      where: {
-        userId: session.user.id,
-        date: {
-          gte: startOfShift,
-          lte: endOfShift
-        },
-        completed: false
-      }
-    })
+    // Use queryRaw to bypass potential undefined 'prisma.task' on stale client
+    const tasksResult = await prisma.$queryRaw`
+        SELECT COUNT(*)::int as count FROM "Task"
+        WHERE "userId" = ${session.user.id}
+        AND "date" >= ${startOfShift}
+        AND "date" <= ${endOfShift}
+        AND "completed" = false
+    ` as any[]
+
+    const incompleteTasks = tasksResult[0]?.count || 0
 
     if (incompleteTasks > 0) {
       return NextResponse.json(
@@ -104,13 +104,19 @@ export async function POST(req: NextRequest) {
     const duration = `${diffHrs}h ${diffMins}m`
 
     // Send email notification
-    if (updated) {
-      await sendCheckOutEmail(
-        session.user.email!,
-        session.user.name!,
-        formatTime(now),
-        duration
-      )
+    // Send email notification
+    try {
+      if (updated && session.user.email && session.user.name) {
+        await sendCheckOutEmail(
+          session.user.email,
+          session.user.name,
+          formatTime(now),
+          duration
+        )
+      }
+    } catch (emailError) {
+      console.error('Failed to send check-out email:', emailError)
+      // Continue execution - do not fail checkout
     }
 
     return NextResponse.json({ attendance: updated })

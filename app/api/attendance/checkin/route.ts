@@ -34,11 +34,19 @@ export async function POST(req: NextRequest) {
     const shiftDate = getShiftDate(now, user?.checkInTime, user?.checkOutTime)
 
     // Check for Shift Override
-    const override = await prisma.shiftOverride.findUnique({
+    // Check for Shift Override
+    // Use findFirst with Date Range to robustly fuzzy-match the date (ignoring exact time mismatch between Midnight stored vs ShiftStart calculated)
+    const startOfShiftDay = new Date(shiftDate)
+    startOfShiftDay.setHours(0, 0, 0, 0)
+    const endOfShiftDay = new Date(shiftDate)
+    endOfShiftDay.setHours(23, 59, 59, 999)
+
+    const override = await prisma.shiftOverride.findFirst({
       where: {
-        userId_shiftDate: {
-          userId: session.user.id,
-          shiftDate,
+        userId: session.user.id,
+        shiftDate: {
+          gte: startOfShiftDay,
+          lte: endOfShiftDay
         },
       },
     })

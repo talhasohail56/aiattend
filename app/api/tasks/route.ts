@@ -30,9 +30,9 @@ export async function GET(req: NextRequest) {
         }
 
         // ... (GET continuation)
-        const startOfDay = new Date(queryDate)
+        const startOfDay = new Date(dateParam)
         startOfDay.setHours(0, 0, 0, 0)
-        const endOfDay = new Date(queryDate)
+        const endOfDay = new Date(dateParam)
         endOfDay.setHours(23, 59, 59, 999)
 
         // Use queryRaw to bypass potential undefined 'prisma.task' on stale client

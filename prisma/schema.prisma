@@ -68,6 +68,22 @@ model ShiftOverride {
   updatedAt      DateTime @updatedAt
 
   @@unique([userId, shiftDate])
+  @@unique([userId, shiftDate])
   @@index([userId])
+}
+
+model LateRequest {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftDate     DateTime
+  requestedTime String
+  reason        String
+  status        String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }
 

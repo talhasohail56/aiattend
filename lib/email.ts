@@ -156,3 +156,52 @@ export async function sendWelcomeEmail(
         return null
     }
 }
+
+export async function sendLateRequestEmail(
+    adminEmail: string,
+    employeeName: string,
+    shiftDate: string,
+    time: string,
+    reason: string,
+    approveLink: string,
+    rejectLink: string
+) {
+    if (!resend) {
+        return null
+    }
+
+    try {
+        const { data, error } = await resend.emails.send({
+            from: `Attendance System <${FROM_EMAIL}>`,
+            to: [adminEmail],
+            subject: `LATE REQUEST: ${employeeName} for ${shiftDate}`,
+            html: `
+        <h1>Late Arrival Request</h1>
+        <p><strong>Employee:</strong> ${employeeName}</p>
+        <p><strong>Date:</strong> ${shiftDate}</p>
+        <p><strong>Requested Time:</strong> ${time}</p>
+        <p><strong>Reason:</strong> ${reason}</p>
+        <br>
+        <p>Please click one of the buttons below to approve or reject this request.</p>
+        <br>
+        <div style="display: flex; gap: 20px;">
+            <a href="${approveLink}" style="background-color: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Accept Request</a>
+            <a href="${rejectLink}" style="background-color: #ef4444; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reject Request</a>
+        </div>
+        <p style="margin-top: 20px; font-size: 12px; color: #666;">
+            Accepting will automatically update the schedule for this day.
+        </p>
+      `,
+        })
+
+        if (error) {
+            console.error('Email error:', error)
+            return null
+        }
+
+        return data
+    } catch (err) {
+        console.error('Email exception:', err)
+        return null
+    }
+}

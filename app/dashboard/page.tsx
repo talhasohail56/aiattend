@@ -609,52 +609,52 @@ export default function DashboardPage() {
           </Card>
         </div>
       </div>
-    </div>
 
-      {/* Late Request Dialog */ }
-  <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
-    <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
-      <DialogHeader>
-        <DialogTitle>Request Late Arrival</DialogTitle>
-        <DialogDescription className="text-neutral-500">
-          Notify admin that you will be late. If approved, your schedule will be adjusted.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="py-4 space-y-4">
-        <div className="space-y-2">
-          <Label className="text-neutral-200">Date</Label>
-          <Input
-            type="date"
-            value={requestDate}
-            onChange={(e) => setRequestDate(e.target.value)}
-            className="bg-neutral-950 border-neutral-800 text-neutral-200"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-neutral-200">Expected Arrival Time</Label>
-          <Input
-            type="time"
-            value={requestTime}
-            onChange={(e) => setRequestTime(e.target.value)}
-            className="bg-neutral-950 border-neutral-800 text-neutral-200"
-          />
-        </div>
-        <div className="space-y-2">
-          <Label className="text-neutral-200">Reason</Label>
-          <Textarea
-            value={requestReason}
-            onChange={(e) => setRequestReason(e.target.value)}
-            placeholder="Why are you late?"
-            className="bg-neutral-950 border-neutral-800 text-neutral-200"
-          />
-        </div>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => setRequestOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800">Cancel</Button>
-        <Button onClick={handleLateRequest} className="bg-blue-600 hover:bg-blue-700 text-white">Submit Request</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+
+      {/* Late Request Dialog */}
+      <Dialog open={requestOpen} onOpenChange={setRequestOpen}>
+        <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+          <DialogHeader>
+            <DialogTitle>Request Late Arrival</DialogTitle>
+            <DialogDescription className="text-neutral-500">
+              Notify admin that you will be late. If approved, your schedule will be adjusted.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-neutral-200">Date</Label>
+              <Input
+                type="date"
+                value={requestDate}
+                onChange={(e) => setRequestDate(e.target.value)}
+                className="bg-neutral-950 border-neutral-800 text-neutral-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-neutral-200">Expected Arrival Time</Label>
+              <Input
+                type="time"
+                value={requestTime}
+                onChange={(e) => setRequestTime(e.target.value)}
+                className="bg-neutral-950 border-neutral-800 text-neutral-200"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-neutral-200">Reason</Label>
+              <Textarea
+                value={requestReason}
+                onChange={(e) => setRequestReason(e.target.value)}
+                placeholder="Why are you late?"
+                className="bg-neutral-950 border-neutral-800 text-neutral-200"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRequestOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800">Cancel</Button>
+            <Button onClick={handleLateRequest} className="bg-blue-600 hover:bg-blue-700 text-white">Submit Request</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div >
   )
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { ArrowRight, CheckCircle2, ShieldCheck, Zap } from 'lucide-react'
 import { MapPin, Calendar, Clock, LogOut, CheckCircle, AlertTriangle, AlertCircle, CalendarClock } from 'lucide-react'
-import { MapPin, Calendar, Clock, LogOut, CheckCircle, AlertTriangle, AlertCircle, CalendarClock } from 'lucide-react'
+
 export default function HomePage() {
 
 

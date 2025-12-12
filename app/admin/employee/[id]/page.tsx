@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter, useParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { formatDate, formatTime, formatDateTime } from '@/lib/attendance'
+import { formatDate, formatTime } from '@/lib/attendance'
 import { getGoogleMapsLink } from '@/lib/location'
 import { ArrowLeft, MapPin, Download, Calendar } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
@@ -32,7 +32,12 @@ interface Stats {
   noCheckout: number
 }
 
-
+interface Task {
+  id: string
+  title: string
+  completed: boolean
+  date: string
+}
 
 export default function EmployeeDetailPage() {
   const { data: session } = useSession()
@@ -41,7 +46,7 @@ export default function EmployeeDetailPage() {
   const employeeId = params.id as string
 
   const [attendances, setAttendances] = useState<Attendance[]>([])
-  const [tasks, setTasks] = useState<Task[]>([]) // Fetched tasks
+  const [tasks, setTasks] = useState<Task[]>([])
   const [stats, setStats] = useState<Stats>({
     total: 0,
     present: 0,
@@ -53,9 +58,128 @@ export default function EmployeeDetailPage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
-  // Task Management State
+  // Task Management
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0])
+
+  useEffect(() => {
+    // Only check role if session is loaded (session !== undefined)
+    if (session?.user && session.user.role !== 'ADMIN') {
+      router.push('/admin')
+    }
+  }, [session, router])
+
+  // Load Initial Data
+  useEffect(() => {
+    if (session?.user?.role === 'ADMIN' && employeeId) {
+      loadData()
+    }
+  }, [session, employeeId, startDate, endDate])
+
+  const loadData = async () => {
+    try {
+      setLoading(true)
+      const params = new URLSearchParams({
+        userId: employeeId,
+        ...(startDate && { startDate }),
+        ...(endDate && { endDate }),
+      })
+
+      const [attendanceRes, statsRes, tasksRes] = await Promise.all([
+        fetch(`/api/admin/attendance?${params}`),
+        fetch(`/api/admin/stats?${params}`),
+        fetch(`/api/tasks?userId=${employeeId}&date=${taskDate}`),
+      ])
+
+      const attendanceData = await attendanceRes.json()
+      const statsData = await statsRes.json()
+      const tasksData = await tasksRes.json()
+
+      setAttendances(attendanceData.attendances || [])
+      setStats(statsData)
+      setTasks(tasksData.tasks || [])
+    } catch (error) {
+      console.error('Failed to load data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Reload tasks when taskDate changes separately
+  useEffect(() => {
+    if (employeeId && taskDate) {
+      fetch(`/api/tasks?userId=${employeeId}&date=${taskDate}`)
+        .then(res => res.json())
+        .then(data => setTasks(data.tasks || []))
+        .catch(err => console.error('Task fetch error:', err))
+    }
+  }, [taskDate, employeeId])
+
+  const handleCreateTask = async () => {
+    if (!taskTitle || !taskDate) return
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: employeeId,
+          date: taskDate,
+          title: taskTitle
+        })
+      })
+      if (res.ok) {
+        setTaskTitle('')
+        // Refresh tasks
+        const tasksRes = await fetch(`/api/tasks?userId=${employeeId}&date=${taskDate}`)
+        const data = await tasksRes.json()
+        setTasks(data.tasks || [])
+      } else {
+        alert('Failed to create task')
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Failed to create task')
+    }
+  }
+
+  const handleExport = () => {
+    const params = new URLSearchParams({
+      userId: employeeId,
+      ...(startDate && { startDate }),
+      ...(endDate && { endDate }),
+    })
+    window.open(`/api/admin/export?${params}`, '_blank')
+  }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'ON_TIME':
+        return <Badge className="bg-emerald-950/30 text-emerald-400 border-emerald-900/30">On Time</Badge>
+      case 'LATE':
+        return <Badge className="bg-amber-950/30 text-amber-400 border-amber-900/30">Late</Badge>
+      case 'ABSENT':
+        return <Badge className="bg-red-950/30 text-red-400 border-red-900/30">Absent</Badge>
+      case 'NO_CHECKOUT':
+        return <Badge className="bg-neutral-800 text-neutral-400 border-neutral-700">No Checkout</Badge>
+      default:
+        return <Badge className="bg-neutral-800 text-neutral-400">{status}</Badge>
+    }
+  }
+
+  // Derived Chart Data (Simple aggregation from attendances)
+  const chartData = useMemo(() => {
+    // Group by date, count statuses
+    // For simplicity in this fix, we map attendances to chart points
+    // Or return empty if complex logic is needed.
+    // Let's make a simple array from attendances (limit 30)
+    return attendances.slice(0, 30).reverse().map(a => ({
+      date: formatDate(new Date(a.shiftDate)),
+      present: a.status === 'ON_TIME' ? 1 : 0,
+      late: a.status === 'LATE' ? 1 : 0,
+      absent: a.status === 'ABSENT' ? 1 : 0,
+      noCheckout: a.status === 'NO_CHECKOUT' ? 1 : 0
+    }))
+  }, [attendances])
 
   if (loading) {
     return (
@@ -312,7 +436,7 @@ export default function EmployeeDetailPage() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => router.push(`/admin/attendance/${attendance.id}`)} // Assuming this route exists or logic is handled elsewhere
+                            onClick={() => router.push(`/admin/attendance/${attendance.id}`)}
                             className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-white"
                           >
                             Edit
@@ -330,5 +454,3 @@ export default function EmployeeDetailPage() {
     </div>
   )
 }
-
-

@@ -54,6 +54,33 @@ export async function POST(req: NextRequest) {
       )
     }
 
+
+    // CHECK FOR INCOMPLETE TASKS
+    // Get the start of the "shift date" for this attendance
+    // attendance.shiftDate is a DateTime object.
+    const startOfShift = new Date(attendance.shiftDate)
+    startOfShift.setHours(0, 0, 0, 0)
+    const endOfShift = new Date(attendance.shiftDate)
+    endOfShift.setHours(23, 59, 59, 999)
+
+    const incompleteTasks = await prisma.task.count({
+      where: {
+        userId: session.user.id,
+        date: {
+          gte: startOfShift,
+          lte: endOfShift
+        },
+        completed: false
+      }
+    })
+
+    if (incompleteTasks > 0) {
+      return NextResponse.json(
+        { error: `You have ${incompleteTasks} incomplete task(s). Please complete them before checking out.` },
+        { status: 400 }
+      )
+    }
+
     // Update attendance with check-out
     const updated = await prisma.attendance.update({
       where: {

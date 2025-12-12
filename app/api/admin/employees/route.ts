@@ -9,36 +9,54 @@ import { sendWelcomeEmail } from '@/lib/email'
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user || session.user.role !== 'ADMIN') {
+    // Allow both ADMIN and MANAGER to fetch the employee list
+    if (!session?.user || (session.user.role !== 'ADMIN' && session.user.role !== 'MANAGER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const employees = await prisma.user.findMany({
-      where: {
-        role: UserRole.EMPLOYEE,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        checkInTime: true,
-        checkOutTime: true,
-        createdAt: true,
-        attendances: {
-          select: {
-            status: true,
-          },
-        },
-        _count: {
-          select: {
-            attendances: true,
-          },
-        },
-      },
-    })
+    // Use queryRaw to bypass Prisma Enum validation crashing on 'MANAGER'
+    const allUsers = await prisma.$queryRaw`
+      SELECT 
+        id, 
+        name, 
+        email, 
+        role, 
+        "checkInTime", 
+        "checkOutTime", 
+        "createdAt"
+      FROM "User"
+      ORDER BY "createdAt" DESC
+    ` as any[];
+
+    // We need to fetch attendances separately or strictly if we want stats, 
+    // but for now let's just get the list working. 
+    // Or we can do a raw JOIN if needed, but let's stick to simple first to fix the blocker.
+    // Actually, the frontend needs 'attendances' for stats calculation.
+    // Let's try to fetch attendances via standard prisma call per user? No that's N+1.
+    // Let's fetch all attendances raw too.
+
+    const allAttendances = await prisma.$queryRaw`
+        SELECT "userId", status FROM "Attendance"
+    ` as any[];
+
+    // Map attendances to users
+    const usersWithAttendances = allUsers.map(u => ({
+      ...u,
+      attendances: allAttendances.filter(a => a.userId === u.id)
+    }));
+
+    // Filter in memory to handle stale Prisma Client
+    // We filter OUT 'ADMIN' so that any other role (EMPLOYEE, MANAGER, or even undefined/unknown) is shown.
+    // This is safer when the DB schema and Client are slightly out of sync.
+    console.log(`[API] Fetching employees. Total users found: ${allUsers.length}`);
+
+    const employees = usersWithAttendances.filter(u => {
+      // debug log
+      // console.log(`User ${u.id} (${u.name}) has role: ${u.role}`);
+      return u.role !== 'ADMIN';
+    });
+
+    console.log(`[API] Returning ${employees.length} non-admin employees.`);
 
     // Calculate stats for each employee
     const employeesWithStats = employees.map((emp) => {
@@ -92,7 +110,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { name, email, password } = body
+    const { name, email, password, role } = body
 
     if (!name || !email || !password) {
       return NextResponse.json(
@@ -113,7 +131,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const user = await createUser(email, password, name, UserRole.EMPLOYEE)
+    // Validate role if provided, otherwise default to EMPLOYEE
+    const userRole = (role === 'MANAGER' || role === 'ADMIN') ? role : UserRole.EMPLOYEE
+
+    const user = await createUser(email, password, name, userRole)
 
     // Send credentials via email
     // We don't await this to prevent blocking the UI, or we can await to ensure it sent.

@@ -32,6 +32,13 @@ interface Stats {
   noCheckout: number
 }
 
+interface Task {
+  id: string
+  title: string
+  completed: boolean
+  date: string
+}
+
 export default function EmployeeDetailPage() {
   const { data: session } = useSession()
   const router = useRouter()
@@ -39,6 +46,7 @@ export default function EmployeeDetailPage() {
   const employeeId = params.id as string
 
   const [attendances, setAttendances] = useState<Attendance[]>([])
+  const [tasks, setTasks] = useState<Task[]>([])
   const [stats, setStats] = useState<Stats>({
     total: 0,
     present: 0,
@@ -49,6 +57,10 @@ export default function EmployeeDetailPage() {
   const [loading, setLoading] = useState(true)
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
+
+  // Task Managment
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0])
 
   useEffect(() => {
     if (session?.user?.role !== 'ADMIN') {
@@ -66,20 +78,60 @@ export default function EmployeeDetailPage() {
         ...(endDate && { endDate }),
       })
 
-      const [attendanceRes, statsRes] = await Promise.all([
+      const [attendanceRes, statsRes, tasksRes] = await Promise.all([
         fetch(`/api/admin/attendance?${params}`),
         fetch(`/api/admin/stats?${params}`),
+        // Fetch tasks for the selected "taskDate" (defaults to today if date picker unused, but wait: startDate/endDate filter attendances. 
+        // Tasks should probably be filtered by the specific helper date picker, or just fetch all for now?
+        // Let's confusingly fetch tasks for specific date state variable `taskDate`
+        fetch(`/api/tasks?userId=${employeeId}&date=${taskDate}`),
       ])
 
       const attendanceData = await attendanceRes.json()
       const statsData = await statsRes.json()
+      const tasksData = await tasksRes.json()
 
       setAttendances(attendanceData.attendances || [])
       setStats(statsData)
+      setTasks(tasksData.tasks || [])
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Reload tasks when taskDate changes separately
+  useEffect(() => {
+    if (employeeId) {
+      fetch(`/api/tasks?userId=${employeeId}&date=${taskDate}`)
+        .then(res => res.json())
+        .then(data => setTasks(data.tasks || []))
+    }
+  }, [taskDate, employeeId])
+
+  const handleCreateTask = async () => {
+    if (!taskTitle || !taskDate) return
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: employeeId,
+          date: taskDate,
+          title: taskTitle
+        })
+      })
+      if (res.ok) {
+        setTaskTitle('')
+        // Refresh tasks
+        const tasksRes = await fetch(`/api/tasks?userId=${employeeId}&date=${taskDate}`)
+        const data = await tasksRes.json()
+        setTasks(data.tasks || [])
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Failed to create task')
     }
   }
 
@@ -107,13 +159,42 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  // Prepare chart data
-  const chartData = attendances.slice(0, 30).reverse().map((att) => ({
-    date: formatDate(new Date(att.shiftDate)),
-    present: att.status === 'ON_TIME' || att.status === 'LATE' ? 1 : 0,
-    late: att.status === 'LATE' ? 1 : 0,
-    absent: att.status === 'ABSENT' ? 1 : 0,
-  }))
+  date: string
+  present: number
+  late: number
+  absent: number
+  noCheckout: number
+}
+
+interface Task {
+  id: string
+  title: string
+  completed: boolean
+  date: string
+}
+
+export default function EmployeeDetailPage() {
+  const { data: session } = useSession()
+  const router = useRouter()
+  const params = useParams()
+  const employeeId = params.id as string
+
+  const [attendances, setAttendances] = useState<Attendance[]>([])
+  const [tasks, setTasks] = useState<Task[]>([]) // Fetched tasks
+  const [stats, setStats] = useState<Stats>({
+    total: 0,
+    present: 0,
+    late: 0,
+    absent: 0,
+    noCheckout: 0,
+  })
+  const [loading, setLoading] = useState(true)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  // Task Management State
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0])
 
   if (loading) {
     return (
@@ -192,6 +273,59 @@ export default function EmployeeDetailPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Task Assignment */}
+        <Card className="mb-8 bg-neutral-900/50 border-neutral-800 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-neutral-200">Assign Tasks</CardTitle>
+            <CardDescription className="text-neutral-500">Manage daily tasks for this employee.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row gap-4 mb-6">
+              <div className="space-y-2">
+                <Label className="text-neutral-200">Date</Label>
+                <Input
+                  type="date"
+                  value={taskDate}
+                  onChange={(e) => setTaskDate(e.target.value)}
+                  className="bg-neutral-950 border-neutral-800 text-neutral-200"
+                />
+              </div>
+              <div className="space-y-2 flex-1">
+                <Label className="text-neutral-200">Task Title</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                    placeholder="e.g. Complete safety training"
+                    className="bg-neutral-950 border-neutral-800 text-neutral-200"
+                  />
+                  <Button onClick={handleCreateTask} className="bg-purple-600 hover:bg-purple-500 text-white">
+                    Add
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-neutral-400 mb-3">Tasks for {taskDate}</h3>
+              {tasks.length === 0 ? (
+                <p className="text-neutral-600 text-sm italic">No tasks assigned for this date.</p>
+              ) : (
+                <div className="space-y-2">
+                  {tasks.map(task => (
+                    <div key={task.id} className="flex items-center justify-between p-3 rounded bg-neutral-800/30 border border-neutral-800">
+                      <span className={task.completed ? "text-neutral-500 line-through" : "text-neutral-200"}>
+                        {task.title}
+                      </span>
+                      {task.completed && <Badge className="bg-emerald-900/30 text-emerald-400">Done</Badge>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Date Filters */}
         <Card className="mb-8 bg-neutral-900/50 border-neutral-800 backdrop-blur-sm">

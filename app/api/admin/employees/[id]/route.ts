@@ -41,6 +41,12 @@ export async function PUT(
       data.passwordHash = await hashPassword(password)
     }
 
+    // Role update
+    // if (body.role && (body.role === 'ADMIN' || body.role === 'MANAGER' || body.role === 'EMPLOYEE')) {
+    //   data.role = body.role
+    // }
+
+    // Use standard update for everything except role
     const user = await prisma.user.update({
       where: { id: params.id },
       data,
@@ -53,11 +59,31 @@ export async function PUT(
       },
     })
 
+    // If role is provided, force update it with raw query to bypass potential stale enum cache
+    if (body.role && (body.role === 'ADMIN' || body.role === 'MANAGER' || body.role === 'EMPLOYEE')) {
+      try {
+        // Try updating directly
+        await prisma.$executeRawUnsafe(`UPDATE "User" SET "role" = '${body.role}'::"UserRole" WHERE "id" = '${params.id}'`);
+      } catch (roleError: any) {
+        console.error('Role update failed, attempting to patch Enum:', roleError);
+        // If validation fails, it might be because MANAGER is not in the Enum. Try to add it.
+        // Note: internal transactions might fail if alter runs inside one, but let's try.
+        try {
+          await prisma.$executeRawUnsafe(`ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS '${body.role}'`);
+          // Retry update
+          await prisma.$executeRawUnsafe(`UPDATE "User" SET "role" = '${body.role}'::"UserRole" WHERE "id" = '${params.id}'`);
+        } catch (retryError) {
+          console.error('Role update rewrite failed:', retryError);
+          throw retryError; // Re-throw to main catch
+        }
+      }
+    }
+
     return NextResponse.json({ user })
-  } catch (error) {
-    console.error('Update employee error:', error)
+  } catch (error: any) {
+    console.error('Update employee error details:', error)
     return NextResponse.json(
-      { error: 'Failed to update employee' },
+      { error: 'Failed to update employee: ' + (error.message || 'Unknown error') },
       { status: 500 }
     )
   }

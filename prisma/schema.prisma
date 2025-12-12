@@ -12,6 +12,7 @@ datasource db {
 
 enum UserRole {
   ADMIN
+  MANAGER
   EMPLOYEE
 }
 
@@ -36,6 +37,7 @@ model User {
   attendances  Attendance[]
   shiftOverrides ShiftOverride[]
   lateRequests   LateRequest[]
+  tasks          Task[]
 }
 
 model Attendance {
@@ -85,5 +87,19 @@ model LateRequest {
 
   @@index([userId])
   @@index([status])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date        DateTime // Represents the shift date/work day
+  title       String
+  completed   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([date])
 }
 

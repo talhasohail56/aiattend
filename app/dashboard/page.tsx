@@ -12,6 +12,8 @@ import { formatDate, formatTime, formatDateTime } from '@/lib/attendance'
 import { MapPin, LogOut, TrendingUp, Clock, XCircle, AlertCircle, CheckCircle, Timer, CalendarClock } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select' // Added
+import { Users } from 'lucide-react' // Added
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -32,11 +34,18 @@ interface AttendanceStatus {
   attendance: Attendance | null
 }
 
+interface Task {
+  id: string
+  title: string
+  completed: boolean
+}
+
 export default function DashboardPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const [currentAttendance, setCurrentAttendance] = useState<Attendance | null>(null)
   const [history, setHistory] = useState<Attendance[]>([])
+  const [tasks, setTasks] = useState<Task[]>([]) // Daily Tasks
   const [loading, setLoading] = useState(true)
   const [checkingIn, setCheckingIn] = useState(false)
   const [checkingOut, setCheckingOut] = useState(false)
@@ -56,6 +65,13 @@ export default function DashboardPage() {
   const [requestDate, setRequestDate] = useState('')
   const [requestTime, setRequestTime] = useState('')
   const [requestReason, setRequestReason] = useState('')
+
+  // Manager State
+  const [managerEmployees, setManagerEmployees] = useState<any[]>([])
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('')
+  const [managerTaskTitle, setManagerTaskTitle] = useState('')
+  const [managerTaskDate, setManagerTaskDate] = useState(new Date().toISOString().split('T')[0])
+  const [loadingManagerData, setLoadingManagerData] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -145,19 +161,22 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const [statusRes, historyRes, timesRes] = await Promise.all([
+      const [statusRes, historyRes, timesRes, tasksRes] = await Promise.all([
         fetch('/api/attendance/status', { cache: 'no-store' }),
         fetch('/api/attendance/history?limit=14', { cache: 'no-store' }),
         fetch('/api/user/times', { cache: 'no-store' }),
+        fetch(`/api/tasks?date=${new Date().toISOString()}`, { cache: 'no-store' }),
       ])
 
       const statusData: AttendanceStatus = await statusRes.json()
       const historyData = await historyRes.json()
       const timesData = await timesRes.json()
+      const tasksData = await tasksRes.json()
 
       setCurrentAttendance(statusData.attendance)
       setHistory(historyData.attendances || [])
       setUserTimes(timesData)
+      setTasks(tasksData.tasks || [])
 
       // Calculate stats
       const statsData = {
@@ -176,10 +195,45 @@ export default function DashboardPage() {
         ).length || 0,
       }
       setStats(statsData)
+
+      // Load Manager Data if needed
+      if ((session?.user?.role as string) === 'MANAGER') {
+        const empRes = await fetch('/api/admin/employees') // Reuse existing endpoint? It returns employees + stats.
+        const empData = await empRes.json()
+        setManagerEmployees(empData.employees || [])
+      }
+
     } catch (error) {
       console.error('Failed to load data:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleManagerAssignTask = async () => {
+    if (!selectedEmployeeId || !managerTaskTitle || !managerTaskDate) return
+    try {
+      setLoadingManagerData(true)
+      const res = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedEmployeeId,
+          date: managerTaskDate,
+          title: managerTaskTitle
+        })
+      })
+      if (res.ok) {
+        setManagerTaskTitle('')
+        alert('Task assigned successfully!')
+      } else {
+        const data = await res.json()
+        alert(data.error || 'Failed to assign task')
+      }
+    } catch (e) {
+      alert('Error assigning task')
+    } finally {
+      setLoadingManagerData(false)
     }
   }
 
@@ -299,6 +353,20 @@ export default function DashboardPage() {
       alert('Request submitted! Talha will be notified.')
     } catch (error) {
       alert('Failed to submit request')
+    }
+  }
+
+  const handleToggleTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/toggle`, { method: 'POST' })
+      if (response.ok) {
+        // Optimistic update or reload
+        setTasks(prev => prev.map(t =>
+          t.id === taskId ? { ...t, completed: !t.completed } : t
+        ))
+      }
+    } catch (error) {
+      console.error('Toggle error', error)
     }
   }
 
@@ -543,6 +611,100 @@ export default function DashboardPage() {
             </Card>
           ))}
         </div>
+
+        {/* Manager Section: Team Tasks */}
+        {/* Manager Section: Team Tasks */}
+        {(session?.user?.role as string) === 'MANAGER' && (
+          <Card className="bg-neutral-900/50 border-neutral-800 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-neutral-200 flex items-center gap-2">
+                <Users className="w-5 h-5 text-blue-400" />
+                Team Task Assignment
+              </CardTitle>
+              <CardDescription className="text-neutral-500">
+                Assign daily tasks to your team members.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="space-y-2">
+                  <Label className="text-neutral-200">Select Employee</Label>
+                  <Select value={selectedEmployeeId} onValueChange={setSelectedEmployeeId}>
+                    <SelectTrigger className="bg-neutral-950 border-neutral-800 text-neutral-200">
+                      <SelectValue placeholder="Select employee..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+                      {managerEmployees.map(emp => (
+                        <SelectItem key={emp.id} value={emp.id}>{emp.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-neutral-200">Date</Label>
+                  <Input
+                    type="date"
+                    value={managerTaskDate}
+                    onChange={(e) => setManagerTaskDate(e.target.value)}
+                    className="bg-neutral-950 border-neutral-800 text-neutral-200"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-neutral-200">Task Title</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={managerTaskTitle}
+                    onChange={(e) => setManagerTaskTitle(e.target.value)}
+                    placeholder="e.g. Organize files..."
+                    className="bg-neutral-950 border-neutral-800 text-neutral-200"
+                  />
+                  <Button
+                    onClick={handleManagerAssignTask}
+                    disabled={loadingManagerData || !selectedEmployeeId || !managerTaskTitle}
+                    className="bg-blue-600 hover:bg-blue-500 text-white"
+                  >
+                    {loadingManagerData ? 'Assigning...' : 'Assign'}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Daily Tasks Section */}
+        <Card className="bg-neutral-900/50 border-neutral-800 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-neutral-200 flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-purple-400" />
+              Today's Tasks
+            </CardTitle>
+            <CardDescription className="text-neutral-500">
+              Complete all tasks to check out.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {tasks.length === 0 ? (
+              <p className="text-neutral-600 text-sm">No tasks assigned for today.</p>
+            ) : (
+              <div className="space-y-3">
+                {tasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-3 p-3 rounded-lg bg-neutral-800/30 border border-neutral-800 hover:border-neutral-700 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={task.completed}
+                      onChange={() => handleToggleTask(task.id)}
+                      className="w-5 h-5 rounded border-neutral-600 bg-neutral-800 text-purple-600 focus:ring-purple-500/50 cursor-pointer"
+                    />
+                    <span className={task.completed ? "text-neutral-500 line-through" : "text-neutral-200"}>
+                      {task.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Charts & History Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

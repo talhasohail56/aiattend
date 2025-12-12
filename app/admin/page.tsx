@@ -34,6 +34,7 @@ interface Employee {
   id: string
   name: string
   email: string
+  role?: string // Added role field
   checkInTime: string | null
   checkOutTime: string | null
   createdAt: string
@@ -92,7 +93,7 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState<Analytics | null>(null)
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
-  const [newEmployee, setNewEmployee] = useState({ name: '', email: '', password: '' })
+  const [newEmployee, setNewEmployee] = useState({ name: '', email: '', password: '', role: 'EMPLOYEE' })
   const [editTimeDialogOpen, setEditTimeDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [editTimes, setEditTimes] = useState({ checkInTime: '', checkOutTime: '' })
@@ -118,6 +119,11 @@ export default function AdminPage() {
   const [overrideEmployee, setOverrideEmployee] = useState<Employee | null>(null)
   const [overrideDate, setOverrideDate] = useState('')
   const [overrideTime, setOverrideTime] = useState('')
+
+  // Role Edit State
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false)
+  const [roleEmployee, setRoleEmployee] = useState<Employee | null>(null)
+  const [selectedRole, setSelectedRole] = useState('')
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -221,6 +227,29 @@ export default function AdminPage() {
     }
   }
 
+  const handleUpdateRole = async () => {
+    if (!roleEmployee || !selectedRole) return
+
+    try {
+      const response = await fetch(`/api/admin/employees/${roleEmployee.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: selectedRole })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update role')
+      }
+
+      setRoleDialogOpen(false)
+      setRoleEmployee(null)
+      loadData()
+      alert('Role updated successfully')
+    } catch (error: any) {
+      alert(error.message || 'Failed to update role')
+    }
+  }
+
   const handleCreateEmployee = async () => {
     try {
       const response = await fetch('/api/admin/employees', {
@@ -243,7 +272,7 @@ export default function AdminPage() {
       })
       setShowCredentialsDialog(true)
 
-      setNewEmployee({ name: '', email: '', password: '' })
+      setNewEmployee({ name: '', email: '', password: '', role: 'EMPLOYEE' })
       loadData()
     } catch (error: any) {
       alert(error.message || 'Failed to create employee')
@@ -383,6 +412,16 @@ export default function AdminPage() {
             </div>
           </div>
           <div className="flex items-center gap-4 w-full md:w-auto justify-between md:justify-end">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={loadData}
+              className="text-neutral-400 hover:text-white"
+              title="Refresh Data"
+            >
+              <Clock className="h-4 w-4 mr-1" />
+              Refresh
+            </Button>
             <span className="text-sm font-medium text-neutral-200">
               {session?.user?.name}
             </span>
@@ -602,6 +641,22 @@ export default function AdminPage() {
                       className="bg-neutral-950 border-neutral-800 text-neutral-200 placeholder:text-neutral-600"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="role" className="text-neutral-200">Role</Label>
+                    <Select
+                      value={newEmployee.role}
+                      onValueChange={(val) => setNewEmployee({ ...newEmployee, role: val })}
+                    >
+                      <SelectTrigger className="bg-neutral-950 border-neutral-800 text-neutral-200">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+                        <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                        <SelectItem value="MANAGER">Manager</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800 hover:text-white">
@@ -618,6 +673,7 @@ export default function AdminPage() {
                 <TableHeader>
                   <TableRow className="border-neutral-800 hover:bg-neutral-800/50">
                     <TableHead className="text-neutral-500">Name</TableHead>
+                    <TableHead className="text-neutral-500">Role</TableHead>
                     <TableHead className="text-neutral-500">Email</TableHead>
                     <TableHead className="text-neutral-500">Performance</TableHead>
                     <TableHead className="text-neutral-500">On-Time Rate</TableHead>
@@ -646,6 +702,15 @@ export default function AdminPage() {
                             )}
                             {employee.name}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-neutral-400">
+                          {employee.role === 'MANAGER' ? (
+                            <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20">Manager</Badge>
+                          ) : employee.role === 'ADMIN' ? (
+                            <Badge className="bg-neutral-100 text-black border-white">Admin</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-neutral-800 text-neutral-500">Employee</Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-neutral-400">{employee.email}</TableCell>
                         <TableCell>
@@ -718,6 +783,19 @@ export default function AdminPage() {
                             >
                               <CalendarClock className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setRoleEmployee(employee)
+                                setSelectedRole('EMPLOYEE') // This can be improved to fetch current role if available in frontend model
+                                setRoleDialogOpen(true)
+                              }}
+                              className="bg-neutral-800 border-neutral-700 text-purple-500 hover:bg-neutral-700 hover:text-purple-400"
+                              title="Change Role"
+                            >
+                              <Users className="h-4 w-4" />
+                            </Button>
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <Button
@@ -752,6 +830,43 @@ export default function AdminPage() {
             </div>
           </CardContent>
         </Card>
+
+
+
+        {/* Change Role Dialog */}
+        <Dialog open={roleDialogOpen} onOpenChange={setRoleDialogOpen}>
+          <DialogContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+            <DialogHeader>
+              <DialogTitle>Change Role</DialogTitle>
+              <DialogDescription className="text-neutral-500">
+                Update role for <span className="text-white font-medium">{roleEmployee?.name}</span>.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-neutral-200">Select Role</Label>
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="bg-neutral-950 border-neutral-800 text-neutral-200">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-neutral-900 border-neutral-800 text-neutral-200">
+                    <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                    <SelectItem value="MANAGER">Manager</SelectItem>
+                    <SelectItem value="ADMIN">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRoleDialogOpen(false)} className="border-neutral-700 text-neutral-400 hover:bg-neutral-800">
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateRole} className="bg-white text-black hover:bg-neutral-200">
+                Update Role
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Change Password Dialog */}
         <Dialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen}>
@@ -1075,7 +1190,7 @@ export default function AdminPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div>
-    </div>
+      </div >
+    </div >
   )
 }

@@ -205,3 +205,57 @@ export async function sendLateRequestEmail(
         return null
     }
 }
+
+
+// Gmail Transporter for Employee Notifications (Free Tier Bypass)
+import nodemailer from 'nodemailer'
+
+const gmailTransporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: process.env.GMAIL_USER,
+        pass: process.env.GMAIL_APP_PASSWORD,
+    },
+})
+
+export async function sendLateRequestDecisionEmail(
+    employeeEmail: string,
+    employeeName: string,
+    shiftDate: string,
+    status: 'APPROVED' | 'REJECTED',
+    reason?: string
+) {
+    // We use Gmail here because Resend Free Tier forbids sending to unverified emails (employees)
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        console.warn('GMAIL credentials missing. Skipping decision email.')
+        return null
+    }
+
+    const isApproved = status === 'APPROVED'
+    const color = isApproved ? '#10b981' : '#ef4444' // Green or Red
+    const title = isApproved ? 'Late Request Approved' : 'Late Request Rejected'
+
+    try {
+        const info = await gmailTransporter.sendMail({
+            from: `"Attendance Admin" <${process.env.GMAIL_USER}>`,
+            to: employeeEmail,
+            subject: `Request Update: ${title}`,
+            html: `
+        <h1 style="color: ${color};">${title}</h1>
+        <p>Hi ${employeeName},</p>
+        <p>Your request for late arrival on <strong>${shiftDate}</strong> has been <strong>${status}</strong>.</p>
+        ${isApproved
+                    ? `<p>Your schedule has been updated accordingly.</p>`
+                    : `<p>Please contact the admin if you have questions.</p>`
+                }
+        <br>
+        <p>Best,<br>Attendance Admin</p>
+      `,
+        })
+
+        return info
+    } catch (err) {
+        console.error('Gmail send error:', err)
+        return null
+    }
+}

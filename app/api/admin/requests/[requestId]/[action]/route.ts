@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db'
+import { sendLateRequestDecisionEmail } from '@/lib/email'
 
 export async function GET(
     req: NextRequest,
@@ -20,6 +21,8 @@ export async function GET(
         if (request.status !== 'PENDING') {
             return new NextResponse(`Request already ${request.status}`, { status: 400 })
         }
+
+
 
         if (action === 'approve') {
             // Update Request
@@ -48,6 +51,16 @@ export async function GET(
                 }
             })
 
+            // Notify Employee
+            if (request.user.email) {
+                await sendLateRequestDecisionEmail(
+                    request.user.email,
+                    request.user.name || 'Employee',
+                    new Date(request.shiftDate).toDateString(),
+                    'APPROVED'
+                )
+            }
+
             return new NextResponse(`
                 <html>
                     <body style="font-family: sans-serif; text-align: center; padding-top: 50px; background-color: #f0fdf4;">
@@ -63,6 +76,16 @@ export async function GET(
                 where: { id: requestId },
                 data: { status: 'REJECTED' }
             })
+
+            // Notify Employee
+            if (request.user.email) {
+                await sendLateRequestDecisionEmail(
+                    request.user.email,
+                    request.user.name || 'Employee',
+                    new Date(request.shiftDate).toDateString(),
+                    'REJECTED'
+                )
+            }
 
             return new NextResponse(`
                 <html>

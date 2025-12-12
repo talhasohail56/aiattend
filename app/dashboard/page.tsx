@@ -649,13 +649,75 @@ export default function DashboardPage() {
 
             <div className="space-y-2">
               <Label className="text-sm font-medium text-neutral-300">Expected Arrival Time</Label>
-              <div className="relative">
-                <Input
-                  type="time"
-                  value={requestTime}
-                  onChange={(e) => setRequestTime(e.target.value)}
-                  className="bg-neutral-800/50 border-neutral-700 text-neutral-200 focus:ring-purple-500/50 focus:border-purple-500 h-11 rounded-xl transition-all"
-                />
+              <div className="flex gap-2">
+                <select
+                  value={(() => {
+                    const [h] = requestTime.split(':')
+                    if (!h) return '12'
+                    let hours = parseInt(h)
+                    if (hours === 0) return '12'
+                    if (hours > 12) return (hours - 12).toString().padStart(2, '0')
+                    return hours.toString().padStart(2, '0')
+                  })()}
+                  onChange={(e) => {
+                    const newHour = parseInt(e.target.value)
+                    const [_, m] = requestTime.split(':')
+                    const minutes = m ? parseInt(m) : 0
+                    const currentH = requestTime ? parseInt(requestTime.split(':')[0]) : 12
+                    const isPM = currentH >= 12
+
+                    let finalH = newHour
+                    if (isPM && newHour !== 12) finalH += 12
+                    else if (!isPM && newHour === 12) finalH = 0
+
+                    const timeStr = `${finalH.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
+                    setRequestTime(timeStr)
+                  }}
+                  className="bg-neutral-800/50 border border-neutral-700 text-neutral-200 rounded-xl px-3 h-11 focus:ring-purple-500/50 focus:border-purple-500 flex-1 transition-all appearance-none text-center"
+                >
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                    <option key={h} value={h.toString().padStart(2, '0')}>
+                      {h.toString().padStart(2, '0')}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center text-neutral-500">:</div>
+                <select
+                  value={requestTime.split(':')[1] || '00'}
+                  onChange={(e) => {
+                    const [h] = requestTime.split(':')
+                    const hour = h || '09'
+                    setRequestTime(`${hour}:${e.target.value}`)
+                  }}
+                  className="bg-neutral-800/50 border border-neutral-700 text-neutral-200 rounded-xl px-3 h-11 focus:ring-purple-500/50 focus:border-purple-500 flex-1 transition-all appearance-none text-center"
+                >
+                  {['00', '15', '30', '45'].map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+                <select
+                  value={(() => {
+                    const [h] = requestTime.split(':')
+                    if (!h) return 'AM'
+                    const hours = parseInt(h)
+                    return hours >= 12 ? 'PM' : 'AM'
+                  })()}
+                  onChange={(e) => {
+                    const [h, m] = requestTime.split(':')
+                    let hours = h ? parseInt(h) : 9 // Default 9
+                    const minutes = m || '00'
+                    const newPeriod = e.target.value
+
+                    if (newPeriod === 'PM' && hours < 12) hours += 12
+                    else if (newPeriod === 'AM' && hours >= 12) hours -= 12
+
+                    setRequestTime(`${hours.toString().padStart(2, '0')}:${minutes}`)
+                  }}
+                  className="bg-neutral-800/50 border border-neutral-700 text-neutral-200 rounded-xl px-3 h-11 focus:ring-purple-500/50 focus:border-purple-500 w-20 transition-all appearance-none text-center font-medium"
+                >
+                  <option value="AM">AM</option>
+                  <option value="PM">PM</option>
+                </select>
               </div>
             </div>
 

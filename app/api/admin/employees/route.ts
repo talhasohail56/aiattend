@@ -61,10 +61,10 @@ export async function GET(req: NextRequest) {
     // Calculate stats for each employee
     const employeesWithStats = employees.map((emp) => {
       const total = emp.attendances.length
-      const onTime = emp.attendances.filter((a) => a.status === AttendanceStatus.ON_TIME).length
-      const late = emp.attendances.filter((a) => a.status === AttendanceStatus.LATE).length
-      const absent = emp.attendances.filter((a) => a.status === AttendanceStatus.ABSENT).length
-      const noCheckout = emp.attendances.filter((a) => a.status === AttendanceStatus.NO_CHECKOUT).length
+      const onTime = emp.attendances.filter((a: any) => a.status === AttendanceStatus.ON_TIME).length
+      const late = emp.attendances.filter((a: any) => a.status === AttendanceStatus.LATE).length
+      const absent = emp.attendances.filter((a: any) => a.status === AttendanceStatus.ABSENT).length
+      const noCheckout = emp.attendances.filter((a: any) => a.status === AttendanceStatus.NO_CHECKOUT).length
 
       const onTimeRate = total > 0 ? Math.round((onTime / total) * 100) : 0
       const lateRate = total > 0 ? Math.round((late / total) * 100) : 0

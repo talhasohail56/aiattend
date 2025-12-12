@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
             select: { email: true }
         })
 
+        console.log(`[LateRequest] Found ${admins.length} admins to notify.`)
+
         // Generate Links
         // Base URL needed.
         const protocol = req.headers.get('x-forwarded-proto') || 'http'
@@ -48,17 +50,23 @@ export async function POST(req: NextRequest) {
         const rejectLink = `${baseUrl}/api/admin/requests/${lateRequest.id}/reject`
 
         // Send Emails
-        await Promise.all(admins.map(admin => {
+        await Promise.all(admins.map(async (admin) => {
             if (admin.email) {
-                return sendLateRequestEmail(
-                    admin.email,
-                    session.user.name!,
-                    shiftDate,
-                    requestedTime,
-                    reason,
-                    approveLink,
-                    rejectLink
-                )
+                console.log(`[LateRequest] Sending email to ${admin.email}...`)
+                try {
+                    await sendLateRequestEmail(
+                        admin.email,
+                        session.user.name!,
+                        shiftDate,
+                        requestedTime,
+                        reason,
+                        approveLink,
+                        rejectLink
+                    )
+                    console.log(`[LateRequest] Email sent successfully to ${admin.email}`)
+                } catch (emailError) {
+                    console.error(`[LateRequest] Failed to send email to ${admin.email}:`, emailError)
+                }
             }
         }))
 

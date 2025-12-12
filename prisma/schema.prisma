@@ -53,6 +53,22 @@ model Attendance {
 
   @@index([userId])
   @@index([shiftDate])
+  @@index([userId])
+  @@index([shiftDate])
   @@unique([userId, shiftDate])
+}
+
+model ShiftOverride {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shiftDate      DateTime // The specific date (start of shift)
+  newCheckInTime String   // "HH:mm"
+  reason         String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, shiftDate])
+  @@index([userId])
 }
 

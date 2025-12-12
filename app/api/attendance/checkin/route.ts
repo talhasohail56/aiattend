@@ -33,8 +33,18 @@ export async function POST(req: NextRequest) {
     const now = new Date()
     const shiftDate = getShiftDate(now, user?.checkInTime, user?.checkOutTime)
 
-    // strict check: Allow max 1 hour early
-    const checkInTimeStr = user?.checkInTime || '21:00' // fallback to default if not found
+    // Check for Shift Override
+    const override = await prisma.shiftOverride.findUnique({
+      where: {
+        userId_shiftDate: {
+          userId: session.user.id,
+          shiftDate,
+        },
+      },
+    })
+
+    // Use Override time if exists, otherwise User Default, otherwise Global Default
+    const checkInTimeStr = override?.newCheckInTime || user?.checkInTime || '21:00'
 
     // We need to compare NOW with SCHEDULED_TIME
     // NOW and SCHEDULED_TIME must both be absolute timestamps.
@@ -75,7 +85,8 @@ export async function POST(req: NextRequest) {
       now: now.toISOString(),
       scheduledIsoString,
       scheduledCheckIn: scheduledCheckIn.toISOString(),
-      diffMinutes
+      diffMinutes,
+      overrideUsed: !!override
     })
 
     // If trying to check in more than 60 minutes early
@@ -112,7 +123,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Create or update attendance record
-    const status = getAttendanceStatus(now, shiftDate, user?.checkInTime)
+    // Pass the EFFECTIVE checkInTime (override or default) to status calculator
+    const status = getAttendanceStatus(now, shiftDate, checkInTimeStr)
     const attendance = await prisma.attendance.upsert({
       where: {
         userId_shiftDate: {

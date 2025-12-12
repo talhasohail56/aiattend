@@ -97,36 +97,7 @@ export async function GET(req: NextRequest) {
       if (existing) {
         filledHistory.push(existing)
       } else {
-        // Don't show "Absent" for Future dates?
-        // If targetShiftDate is Today... and it's not yet checkout time? 
-        // Or if we haven't checked in yet?
-        // Absent implies "Shift Ended and No Show".
-
-        // Allow "Today" to be empty (Upcoming) or Absent?
-        // If i==0 (Today), and no record:
-        // It might be "Upcoming". We shouldn't mark "Absent" yet.
-        // Let's skip i=0 if no record? 
-        // But the user wants to see "Absent" for missed days.
-
-        // Simple rule: If day is fully passed, mark absent.
-        // If day is Today:
-        // Check if Now > CheckInTime + Threshold?
-        // If it is 2am and shift was 9pm, and no record -> Absent (or late pending).
-
-        // For simplicity in this iteration:
-        // If i > 0 (Yesterday and before) -> Mark Absent
-        // If i == 0 (Today) -> Ignore (User sees timer on dashboard)
-
-        if (i > 0) {
-          filledHistory.push({
-            id: `temp_${i}`,
-            shiftDate: targetShiftDate.toISOString(),
-            checkInAt: null,
-            checkOutAt: null,
-            status: 'ABSENT',
-            user: { name: 'You' } // Placeholder
-          })
-        }
+        // Gap filling disabled per user request
       }
     }
 

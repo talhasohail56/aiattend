@@ -145,9 +145,9 @@ export default function DashboardPage() {
   const loadData = async () => {
     try {
       const [statusRes, historyRes, timesRes] = await Promise.all([
-        fetch('/api/attendance/status'),
-        fetch('/api/attendance/history?limit=14'),
-        fetch('/api/user/times'),
+        fetch('/api/attendance/status', { cache: 'no-store' }),
+        fetch('/api/attendance/history?limit=14', { cache: 'no-store' }),
+        fetch('/api/user/times', { cache: 'no-store' }),
       ])
 
       const statusData: AttendanceStatus = await statusRes.json()

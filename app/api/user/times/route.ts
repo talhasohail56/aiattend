@@ -62,8 +62,8 @@ export async function GET(req: NextRequest) {
     })
 
     return NextResponse.json({
-      checkInTime: override?.newCheckInTime || user.checkInTime || '09:00',
-      checkOutTime: user.checkOutTime || '17:00'
+      checkInTime: override?.newCheckInTime || user.checkInTime || '21:00',
+      checkOutTime: user.checkOutTime || '05:00'
     })
   } catch (error) {
     console.error('Get user times error:', error)

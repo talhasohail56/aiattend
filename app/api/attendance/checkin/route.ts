@@ -9,6 +9,10 @@ import { sendCheckInEmail, sendLateNotificationEmail } from '@/lib/email'
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+
+    // Debug Log for Deployment Verification
+    console.log('[API] Check-in Route v2.1 (10PM Global Fix + Overrides)')
+
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

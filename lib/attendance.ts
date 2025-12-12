@@ -1,8 +1,8 @@
 import { AttendanceStatus } from '@prisma/client'
 
 export const DEFAULT_TIMEZONE = process.env.DEFAULT_TIMEZONE || 'Asia/Karachi'
-export const CHECK_IN_TIME = process.env.CHECK_IN_TIME || '21:00'
-export const CHECK_OUT_TIME = process.env.CHECK_OUT_TIME || '05:00'
+export const CHECK_IN_TIME = process.env.CHECK_IN_TIME || '22:00'
+export const CHECK_OUT_TIME = process.env.CHECK_OUT_TIME || '06:00'
 export const LATE_THRESHOLD_MINUTES = parseInt(process.env.LATE_THRESHOLD_MINUTES || '10')
 
 /**
@@ -146,9 +146,40 @@ export function getCheckInDeadline(
   shiftDate: Date,
   userCheckInTime?: string | null
 ): Date {
-  // shiftDate is already the exact Shift Start Timestamp (in correct TZ) from getShiftDate
-  // We just need to add the threshold minutes.
   const deadline = new Date(shiftDate)
+
+  // If a specific check-in time is provided (e.g. from override), update the deadline hour/minute
+  if (userCheckInTime) {
+    const [hours, minutes] = userCheckInTime.split(':').map(Number)
+    // We need to be careful about timezone. 
+    // shiftDate is "YYYY-MM-DDTHH:mm:00+05:00".
+    // We want to keep YYYY-MM-DD and Offset, but change HH:mm.
+    // Since we are running in an environment where New Date() might be UTC...
+
+    // Ideally we'd use setHours(), but that sets Local hours (env dependent).
+    // Let's rely on the fact that shiftDate was constructed with the correct offset.
+    // Actually, the safest way is to rebuild the ISO string same as getShiftDate does.
+
+    // Parse the existing ISO parts from shiftDate
+    // The shiftDate is a Date object. formatting it might convert to UTC.
+    // Let's assume shiftDate is correct.
+
+    // Easier approach: 
+    // Calculate difference between Default Time (on shiftDate) and New Time.
+    // Add that difference.
+
+    const checkInTime = getUserCheckInTime(null) // Default 22:00
+    const [defHours, defMinutes] = checkInTime.split(':').map(Number)
+
+    const defaultMinutes = defHours * 60 + defMinutes
+    const targetMinutes = hours * 60 + minutes
+
+    const diffMinutes = targetMinutes - defaultMinutes
+
+    // Adjust deadline by the difference in schedule
+    deadline.setMinutes(deadline.getMinutes() + diffMinutes)
+  }
+
   deadline.setMinutes(deadline.getMinutes() + LATE_THRESHOLD_MINUTES)
   return deadline
 }

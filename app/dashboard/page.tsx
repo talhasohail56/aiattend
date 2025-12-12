@@ -296,7 +296,7 @@ export default function DashboardPage() {
       setRequestDate('')
       setRequestTime('')
       setRequestReason('')
-      alert('Request submitted! Admin will be notified.')
+      alert('Request submitted! Talha will be notified.')
     } catch (error) {
       alert('Failed to submit request')
     }
@@ -629,7 +629,7 @@ export default function DashboardPage() {
             <DialogHeader>
               <DialogTitle className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">Request Late Arrival</DialogTitle>
               <DialogDescription className="text-neutral-500 text-base mt-2">
-                Running behind schedule? Let the admin know to update your shift.
+                Running behind schedule? Let Talha know to update your shift.
               </DialogDescription>
             </DialogHeader>
           </div>

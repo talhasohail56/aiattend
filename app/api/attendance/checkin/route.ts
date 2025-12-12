@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     })
 
     // Use Override time if exists, otherwise User Default, otherwise Global Default
-    const checkInTimeStr = override?.newCheckInTime || user?.checkInTime || '21:00'
+    const checkInTimeStr = override?.newCheckInTime || user?.checkInTime || '22:00'
 
     // We need to compare NOW with SCHEDULED_TIME
     // NOW and SCHEDULED_TIME must both be absolute timestamps.

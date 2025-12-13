@@ -196,8 +196,8 @@ export default function DashboardPage() {
       }
       setStats(statsData)
 
-      // Load Manager Data if needed
-      if ((session?.user?.role as string) === 'MANAGER') {
+      // Load Manager Data if needed (For Managers AND Admins)
+      if ((session?.user?.role as string) === 'MANAGER' || (session?.user?.role as string) === 'ADMIN') {
         const empRes = await fetch('/api/admin/employees') // Reuse existing endpoint? It returns employees + stats.
         const empData = await empRes.json()
         setManagerEmployees(empData.employees || [])
@@ -613,8 +613,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Manager Section: Team Tasks */}
-        {/* Manager Section: Team Tasks */}
-        {(session?.user?.role as string) === 'MANAGER' && (
+        {/* Manager/Admin Section: Team Tasks */}
+        {((session?.user?.role as string) === 'MANAGER' || (session?.user?.role as string) === 'ADMIN') && (
           <Card className="bg-neutral-900/50 border-neutral-800 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="text-neutral-200 flex items-center gap-2">

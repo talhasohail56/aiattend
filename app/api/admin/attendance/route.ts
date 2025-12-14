@@ -122,13 +122,17 @@ export async function GET(req: NextRequest) {
             // For today, only mark absent if shift time has passed significantly
             // Night shift (21:00-05:00): If it's before 21:00 today, shift hasn't started
             if (isToday) {
-              // Get check-in/out times
-              const checkOutStr = emp.checkOutTime || '18:00'
+              // Get check-in/out times - use env defaults for overnight business
+              const checkInDefault = process.env.CHECK_IN_TIME || '22:00'
+              const checkOutDefault = process.env.CHECK_OUT_TIME || '06:00'
+              const checkOutStr = emp.checkOutTime || checkOutDefault
+              const checkInStr = emp.checkInTime || checkInDefault
               const [outH] = checkOutStr.split(':').map(Number)
+              const [inHUser] = checkInStr.split(':').map(Number)
 
               // For overnight shifts (checkout < checkin), shift ends tomorrow
               // So today's shift hasn't ended yet if it's overnight
-              if (outH < inH) {
+              if (outH < inHUser) {
                 // Overnight shift - today's shift ends tomorrow, so skip
                 continue
               }

@@ -486,10 +486,110 @@ export default function DashboardPage() {
                         Upcoming Shift
                       </Badge>
                       <div className="space-y-1">
-                        <h2 className="text-5xl font-bold text-white tracking-tight tabular-nums">
-                          {timeLeft}
+                        {/* Active Shift Status */}
+                        <h2 className="text-3xl font-bold text-white">
+                          {(() => {
+                            if (currentAttendance?.checkInAt && !currentAttendance?.checkOutAt) {
+                              const now = new Date()
+                              // Parse CheckOut Time (HH:mm) to Date
+                              const [hours, minutes] = (userTimes.checkOutTime || '06:00').split(':').map(Number)
+
+                              // Construct checkout deadline for TODAY (or Tomorrow if overnight)
+                              // Attendance shiftDate is the base.
+                              const shiftDate = new Date(currentAttendance.shiftDate)
+                              const checkOutDate = new Date(shiftDate)
+
+                              // If checkOut hours < checkIn hours (Overnight), checkout is next day relative to shift start
+                              const [inHours] = (userTimes.checkInTime || '22:00').split(':').map(Number)
+                              if (hours < inHours) {
+                                checkOutDate.setDate(checkOutDate.getDate() + 1)
+                              }
+
+                              checkOutDate.setHours(hours, minutes, 0, 0)
+
+                              if (now > checkOutDate) {
+                                return (
+                                  <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
+                                    <span className="text-emerald-400 block text-lg font-medium">Great work! You're on overtime using the grace period.</span>
+                                    <span>Current Session Active</span>
+                                  </div>
+                                )
+                              }
+                              return "Current Session Active"
+                            }
+                            return "Welcome Back"
+                          })()}
                         </h2>
-                        <p className="text-neutral-500">left until check-in at {userTimes.checkInTime}</p>
+                        <p className="text-neutral-500">
+                          {currentAttendance?.checkInAt
+                            ? `Checked in at ${formatTime(new Date(currentAttendance.checkInAt))}`
+                            : "Ready to start your shift?"}
+                        </p>
+                      </div>
+              )}
+
+                      {/* Status Indicator */}
+                      <div className="flex justify-center py-6">
+                        <div className={`
+                  w-32 h-32 rounded-full flex items-center justify-center border-4 relative
+                  ${currentAttendance?.checkInAt && !currentAttendance?.checkOutAt
+                            ? 'border-emerald-500/30 bg-emerald-500/5 shadow-[0_0_30px_-5px_rgba(16,185,129,0.3)]'
+                            : 'border-neutral-800 bg-neutral-900/50'
+                          }
+                `}>
+                          {currentAttendance?.checkInAt && !currentAttendance?.checkOutAt && (
+                            <div className="absolute inset-0 rounded-full border-t-4 border-emerald-500 animate-spin" style={{ animationDuration: '3s' }} />
+                          )}
+                          <div className="text-center z-10">
+                            <p className="text-xs font-medium uppercase tracking-wider text-neutral-500 mb-1">Current Status</p>
+                            <p className={`text-lg font-bold ${currentAttendance?.checkInAt && !currentAttendance?.checkOutAt
+                                ? 'text-emerald-400'
+                                : 'text-neutral-400'
+                              }`}>
+                              {currentAttendance?.checkInAt && !currentAttendance?.checkOutAt ? "ON DUTY" : "OFF DUTY"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <div className="relative z-20">
+                        {currentAttendance?.checkInAt && !currentAttendance?.checkOutAt ? (
+                          <Button
+                            size="lg"
+                            onClick={handleCheckOut}
+                            disabled={checkingOut}
+                            className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold h-12 shadow-[0_0_20px_-5px_rgba(239,68,68,0.3)] transition-all hover:scale-[1.02]"
+                          >
+                            {checkingOut ? (
+                              <>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                Checking Out...
+                              </>
+                            ) : (
+                              'End Shift'
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="lg"
+                            onClick={handleCheckIn}
+                            disabled={checkingIn || timeLeft !== 'SHIFT_ACTIVE'}
+                            className={`w-full font-semibold h-12 transition-all hover:scale-[1.02] ${timeLeft === 'SHIFT_ACTIVE'
+                                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]'
+                                : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                              }`}
+                          >
+                            {checkingIn ? (
+                              <>
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                                Checking In...
+                              </>
+                            ) : (
+                              'Start Shift'
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </>
                   )}

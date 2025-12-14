@@ -98,29 +98,33 @@ export async function GET(req: NextRequest) {
         const dayDiff = Math.ceil((end.getTime() - empStart.getTime()) / (1000 * 3600 * 24))
         const [inH, inM] = getHM(emp.checkInTime)
 
-        // Loop days
+        // Loop days - iterate using PKT dates
+        const todayPKT = formatDatePKT(new Date())
+
         for (let i = 0; i <= dayDiff; i++) {
           const d = new Date(end)
           d.setDate(d.getDate() - i)
+          d.setHours(0, 0, 0, 0) // Midnight UTC for consistent handling
+
           if (d < empStart) break;
-          if (d.getTime() > new Date().getTime()) continue;
-          d.setHours(inH, inM, 0, 0)
 
-          // Check if exists in DB results
-          // Optimization: We already fetched 'attendances' for the whole range/query.
-          // We can check against 'attendances' array (which contains matches from DB).
-          // BUT 'attendances' array might be filtered by 'take: 1000'.
-          // Assuming 1000 is enough for now.
+          // Get this date in PKT format for consistent comparison
+          const dDatePKT = formatDatePKT(d)
 
-          const exists = attendances.find(a => a.userId === emp.id && isSameDay(new Date(a.shiftDate), d))
+          // Skip future dates (in PKT)
+          if (dDatePKT > todayPKT) continue;
+
+          // Check if attendance exists for this date
+          const exists = attendances.find(a => {
+            const aDatePKT = formatDatePKT(new Date(a.shiftDate))
+            return a.userId === emp.id && aDatePKT === dDatePKT
+          })
 
           if (!exists) {
-            // Check if today and if shift has passed
-            const now = new Date()
-            const isToday = isSameDay(d, now)
+            // Check if today (in PKT) and if shift has passed
+            const isToday = dDatePKT === todayPKT
 
-            // For today, only mark absent if shift time has passed significantly
-            // Night shift (21:00-05:00): If it's before 21:00 today, shift hasn't started
+            // For today, only mark absent if shift time has passed
             if (isToday) {
               // Get check-in/out times - use env defaults for overnight business
               const checkInDefault = process.env.CHECK_IN_TIME || '22:00'
@@ -133,23 +137,27 @@ export async function GET(req: NextRequest) {
               // For overnight shifts (checkout < checkin), shift ends tomorrow
               // So today's shift hasn't ended yet if it's overnight
               if (outH < inHUser) {
-                // Overnight shift - today's shift ends tomorrow, so skip
+                // Overnight shift - today's shift ends tomorrow, so skip today entirely
                 continue
               }
 
-              // For day shift, check if checkout time + grace has passed
-              const shiftEnd = new Date(d)
-              shiftEnd.setHours(outH, 0, 0, 0)
-              shiftEnd.setHours(shiftEnd.getHours() + 2) // 2 hours grace
+              // For day shift, check if checkout time + grace has passed (using PKT hours)
+              const now = new Date()
+              const nowPKTHour = parseInt(new Intl.DateTimeFormat('en-US', {
+                timeZone: 'Asia/Karachi',
+                hour: 'numeric',
+                hour12: false
+              }).format(now))
 
-              if (now < shiftEnd) {
+              const shiftEndHour = outH + 2 // 2 hours grace
+              if (nowPKTHour < shiftEndHour) {
                 // Shift hasn't ended yet
                 continue
               }
             }
 
             // Past day or shift has ended - mark as absent
-            // Create shiftDate at midnight PKT to prevent timezone-induced date shift
+            // Create shiftDate at midnight PKT for correct display
             const shiftDatePKT = startOfDayPKT(d)
             mixedResults.push({
               id: `absent_${emp.id}_${shiftDatePKT.getTime()}`,
@@ -158,7 +166,6 @@ export async function GET(req: NextRequest) {
               checkOutAt: null,
               status: 'ABSENT',
               user: { id: emp.id, name: emp.name, email: emp.email },
-              // Mock other fields
               checkInLatitude: null, checkInLongitude: null,
               checkOutLatitude: null, checkOutLongitude: null
             })

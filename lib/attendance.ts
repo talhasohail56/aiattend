@@ -5,16 +5,30 @@ export const CHECK_IN_TIME = process.env.CHECK_IN_TIME || '22:00'
 export const CHECK_OUT_TIME = process.env.CHECK_OUT_TIME || '06:00'
 export const LATE_THRESHOLD_MINUTES = parseInt(process.env.LATE_THRESHOLD_MINUTES || '10')
 
-// PKT offset in milliseconds (+5 hours)
-const PKT_OFFSET_MS = 5 * 60 * 60 * 1000
+// PKT timezone constant
+const PKT_TIMEZONE = 'Asia/Karachi'
 
 /**
  * Get the current date in PKT timezone as a YYYY-MM-DD string
+ * Uses Intl.DateTimeFormat for correct timezone conversion
  */
 export function getTodayPKT(): string {
-  const now = new Date()
-  const pktNow = new Date(now.getTime() + PKT_OFFSET_MS)
-  return pktNow.toISOString().split('T')[0] // YYYY-MM-DD
+  return formatDatePKT(new Date())
+}
+
+/**
+ * Format a date as YYYY-MM-DD in PKT timezone
+ * Uses Intl.DateTimeFormat for correct timezone conversion
+ */
+export function formatDatePKT(date: Date): string {
+  // Use en-CA locale for YYYY-MM-DD format
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: PKT_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+  return formatter.format(date)
 }
 
 /**
@@ -22,21 +36,11 @@ export function getTodayPKT(): string {
  * This ensures consistent date calculations regardless of server timezone
  */
 export function startOfDayPKT(date: Date = new Date()): Date {
-  // Convert to PKT time
-  const pktDate = new Date(date.getTime() + PKT_OFFSET_MS)
-  // Get YYYY-MM-DD in PKT
-  const dateStr = pktDate.toISOString().split('T')[0]
-  // Create midnight in PKT (which is 19:00 UTC previous day)
+  // Get the date string in PKT
+  const dateStr = formatDatePKT(date)
+  // Create midnight in PKT (parse as PKT timezone)
   // Format: YYYY-MM-DDT00:00:00+05:00
   return new Date(`${dateStr}T00:00:00+05:00`)
-}
-
-/**
- * Format a date as YYYY-MM-DD in PKT timezone
- */
-export function formatDatePKT(date: Date): string {
-  const pktDate = new Date(date.getTime() + PKT_OFFSET_MS)
-  return pktDate.toISOString().split('T')[0]
 }
 
 /**

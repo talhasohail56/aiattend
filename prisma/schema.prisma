@@ -22,6 +22,7 @@ enum AttendanceStatus {
   LATE
   ABSENT
   NO_CHECKOUT
+  OVERTIME
 }
 
 model User {

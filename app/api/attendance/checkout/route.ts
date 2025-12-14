@@ -81,6 +81,55 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Calculate if Overtime
+    let newStatus = attendance.status
+    const OVERTIME_THRESHOLD_MINUTES = 30 // Consider Overtime if > 30 mins after scheduled end? Or just > 0?
+    // Let's use the explicit checkOutTime from user or default
+    // We need to fetch the user settings again or assume defaults.
+    // Ideally, we compare 'now' vs 'scheduledCheckOutTime' for that shift.
+    // Since we don't have easy access to scheduled time here without re-fetching user settings/overrides, 
+    // we can rely on the logic that determined the shift date.
+
+    // Retrieve User's CheckOut Time
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { checkOutTime: true }
+    })
+
+    if (user) {
+      const scheduledCheckOut = user.checkOutTime || process.env.CHECK_OUT_TIME || '06:00'
+      const [schedHours, schedMinutes] = scheduledCheckOut.split(':').map(Number)
+
+      // Determine Scheduled CheckOut Date/Time
+      // We know attendance.shiftDate. We need to apply schedHours/Minutes to it.
+      // If overnight (Checkout < CheckIn), likely next day.
+      // But simpler: just construct the checkout time relative to the shift date.
+
+      const shiftDate = new Date(attendance.shiftDate)
+      const scheduledEndDate = new Date(shiftDate)
+      scheduledEndDate.setHours(schedHours, schedMinutes, 0, 0)
+
+      // Handle Overnight Adjustment
+      // If we are checking out at like 7AM, and shift started 10PM yesterday.
+      // If scheduled checkout is 6AM.
+      // If 'schedHours' is small (morning) and shiftDate refers to 'evening start', we add 1 day.
+      // Generally if CheckOutTime < CheckInTime (e.g. 06:00 < 22:00).
+      // Let's grab CheckInTime to be sure.
+      const checkInTimeStr = process.env.CHECK_IN_TIME || '22:00' // Approximation if user generic.
+      const [inHours] = checkInTimeStr.split(':').map(Number)
+
+      if (schedHours < inHours) {
+        scheduledEndDate.setDate(scheduledEndDate.getDate() + 1)
+      }
+
+      // If Now > Scheduled + Threshold?
+      // User requested "Overtime" as an option.
+      if (now.getTime() > scheduledEndDate.getTime()) {
+        // It is overtime.
+        newStatus = 'OVERTIME' as AttendanceStatus
+      }
+    }
+
     // Update attendance with check-out
     const updated = await prisma.attendance.update({
       where: {
@@ -90,8 +139,7 @@ export async function POST(req: NextRequest) {
         checkOutAt: now,
         checkOutLatitude: latitude || null,
         checkOutLongitude: longitude || null,
-        // Update status if it was NO_CHECKOUT (though usually status is set at CheckIn)
-        // If we want to mark "Completed", we leave status as is (late/ontime)
+        status: newStatus
       },
     })
 

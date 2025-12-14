@@ -382,6 +382,8 @@ export default function DashboardPage() {
         return <Badge className="bg-red-500/10 text-red-400 border-red-500/20">Absent</Badge>
       case 'NO_CHECKOUT':
         return <Badge className="bg-gray-500/10 text-gray-400 border-gray-500/20">No Checkout</Badge>
+      case 'OVERTIME':
+        return <Badge className="bg-purple-500/10 text-purple-400 border-purple-500/20 shadow-[0_0_10px_-4px_rgba(168,85,247,0.4)]">Overtime</Badge>
       default:
         return <Badge variant="outline" className="border-white/20 text-white">{status}</Badge>
     }

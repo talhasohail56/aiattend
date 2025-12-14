@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { AttendanceStatus } from '@prisma/client'
+import { startOfDayPKT, formatDatePKT } from '@/lib/attendance'
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,7 +69,7 @@ export async function GET(req: NextRequest) {
       // Fetch valid employees
       const employees = await prisma.user.findMany({
         where: { role: { not: 'ADMIN' } },
-        select: { id: true, name: true, email: true, createdAt: true, checkInTime: true }
+        select: { id: true, name: true, email: true, createdAt: true, checkInTime: true, checkOutTime: true }
       })
 
       // Determine date range
@@ -114,22 +115,47 @@ export async function GET(req: NextRequest) {
           const exists = attendances.find(a => a.userId === emp.id && isSameDay(new Date(a.shiftDate), d))
 
           if (!exists) {
-            // Check if today
+            // Check if today and if shift has passed
             const now = new Date()
             const isToday = isSameDay(d, now)
-            if (!isToday) {
-              mixedResults.push({
-                id: `absent_${emp.id}_${d.getTime()}`,
-                shiftDate: d.toISOString(),
-                checkInAt: null,
-                checkOutAt: null,
-                status: 'ABSENT',
-                user: { id: emp.id, name: emp.name, email: emp.email },
-                // Mock other fields
-                checkInLatitude: null, checkInLongitude: null,
-                checkOutLatitude: null, checkOutLongitude: null
-              })
+
+            // For today, only mark absent if shift time has passed significantly
+            // Night shift (21:00-05:00): If it's before 21:00 today, shift hasn't started
+            if (isToday) {
+              // Get check-in/out times
+              const checkOutStr = emp.checkOutTime || '18:00'
+              const [outH] = checkOutStr.split(':').map(Number)
+
+              // For overnight shifts (checkout < checkin), shift ends tomorrow
+              // So today's shift hasn't ended yet if it's overnight
+              if (outH < inH) {
+                // Overnight shift - today's shift ends tomorrow, so skip
+                continue
+              }
+
+              // For day shift, check if checkout time + grace has passed
+              const shiftEnd = new Date(d)
+              shiftEnd.setHours(outH, 0, 0, 0)
+              shiftEnd.setHours(shiftEnd.getHours() + 2) // 2 hours grace
+
+              if (now < shiftEnd) {
+                // Shift hasn't ended yet
+                continue
+              }
             }
+
+            // Past day or shift has ended - mark as absent
+            mixedResults.push({
+              id: `absent_${emp.id}_${d.getTime()}`,
+              shiftDate: d.toISOString(),
+              checkInAt: null,
+              checkOutAt: null,
+              status: 'ABSENT',
+              user: { id: emp.id, name: emp.name, email: emp.email },
+              // Mock other fields
+              checkInLatitude: null, checkInLongitude: null,
+              checkOutLatitude: null, checkOutLongitude: null
+            })
           }
         }
       }
@@ -206,7 +232,8 @@ export async function GET(req: NextRequest) {
 function hours(t: string | null) { return t ? parseInt(t.split(':')[0]) : 9 }
 function minutes(t: string | null) { return t ? parseInt(t.split(':')[1]) : 0 }
 function isSameDay(d1: Date, d2: Date) {
-  return d1.getDate() === d2.getDate() && d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear()
+  // Use PKT-aware date formatting for consistent comparison
+  return formatDatePKT(d1) === formatDatePKT(d2)
 }
 
 function getHM(t: string | null) {

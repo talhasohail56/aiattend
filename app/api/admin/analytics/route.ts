@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth-options'
 import { prisma } from '@/lib/db'
 import { AttendanceStatus } from '@prisma/client'
-import { subDays, startOfDay, format } from 'date-fns'
+import { subDays, format } from 'date-fns'
+import { startOfDayPKT, formatDatePKT } from '@/lib/attendance'
 
 export async function GET(req: NextRequest) {
     try {
@@ -20,7 +21,7 @@ export async function GET(req: NextRequest) {
         const attendances = await prisma.attendance.findMany({
             where: {
                 shiftDate: {
-                    gte: startOfDay(sevenDaysAgo),
+                    gte: startOfDayPKT(sevenDaysAgo),
                     lte: today,
                 },
             },
@@ -94,7 +95,7 @@ export async function GET(req: NextRequest) {
             const dayOfWeek = d.getDay()
             const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
             // Don't count absent for today (shift might not be over) or future
-            const isTodayOrFuture = d >= startOfDay(new Date())
+            const isTodayOrFuture = d >= startOfDayPKT(new Date())
 
             if (!isWeekend && !isTodayOrFuture) {
                 // Check each employee
@@ -152,11 +153,11 @@ export async function GET(req: NextRequest) {
         })
 
         let inferredTotalAbsent = 0
-        const todayEnd = startOfDay(new Date())
+        const todayEnd = startOfDayPKT(new Date())
         // We want to iterate up to "Today" to check if shift passed
 
         employeesWithTime.forEach(e => {
-            const start = startOfDay(new Date(e.createdAt))
+            const start = startOfDayPKT(new Date(e.createdAt))
             const current = new Date(start)
             const now = new Date()
 

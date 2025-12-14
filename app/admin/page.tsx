@@ -166,8 +166,9 @@ export default function AdminPage() {
       setEmployees(employeesData.employees || [])
       setAttendances(attendanceData.attendances || [])
       setAnalytics(analyticsData)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load data:', error)
+      alert(`Debug: Failed to load data. ${error.message}`)
     } finally {
       setLoading(false)
     }
@@ -184,9 +185,6 @@ export default function AdminPage() {
 
     try {
       const response = await fetch(`/api/admin/employees/${passwordEmployee.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: newPassword })
       })
 
       if (!response.ok) {
@@ -413,6 +411,8 @@ export default function AdminPage() {
         return <Badge className="bg-gray-500/10 text-gray-500 border-gray-500/20">No Checkout</Badge>
       case 'OVERTIME':
         return <Badge className="bg-purple-500/10 text-purple-500 border-purple-500/20">Overtime</Badge>
+      case 'EXCUSED':
+        return <Badge className="bg-neutral-500/10 text-neutral-400 border-neutral-500/20">Excused</Badge>
       default:
         return <Badge>{status}</Badge>
     }
@@ -479,6 +479,19 @@ export default function AdminPage() {
       </div>
 
       <div className="container mx-auto px-4 py-8">
+        {/* DEBUGGING BLOCK */}
+        <div className="bg-red-900/20 border border-red-500/50 p-4 rounded text-xs font-mono mb-4 text-red-200">
+          <p className="font-bold">DEBUG INFO:</p>
+          <p>Attendances Count: {attendances.length}</p>
+          <p>Employees Count: {employees.length}</p>
+          <p>Filter Status: {filters.status || 'All'}</p>
+          <p>Filter Start: {filters.startDate || 'None'} / End: {filters.endDate || 'None'}</p>
+          <details>
+            <summary>First Attendance Record</summary>
+            <pre className="whitespace-pre-wrap">{JSON.stringify(attendances[0], null, 2)}</pre>
+          </details>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="bg-neutral-900/50 border-neutral-800 backdrop-blur-sm overflow-hidden group hover:border-neutral-700 transition-all duration-300">
@@ -502,7 +515,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-neutral-500 text-sm">On Time</p>
-                  <p className="text-3xl font-bold text-neutral-200 mt-1">{analytics?.summary.totalOnTime || 0}</p>
+                  <p className="text-3xl font-bold text-neutral-200 mt-1">{analytics?.summary?.totalOnTime || 0}</p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-emerald-950/30 flex items-center justify-center border border-emerald-900/30">
                   <CheckCircle className="h-6 w-6 text-emerald-500" />
@@ -517,7 +530,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-neutral-500 text-sm">Late Arrivals</p>
-                  <p className="text-3xl font-bold text-neutral-200 mt-1">{analytics?.summary.totalLate || 0}</p>
+                  <p className="text-3xl font-bold text-neutral-200 mt-1">{analytics?.summary?.totalLate || 0}</p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-amber-950/30 flex items-center justify-center border border-amber-900/30">
                   <Clock className="h-6 w-6 text-amber-500" />
@@ -532,7 +545,7 @@ export default function AdminPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-neutral-500 text-sm">Absent</p>
-                  <p className="text-3xl font-bold text-neutral-200 mt-1">{analytics?.summary.totalAbsent || 0}</p>
+                  <p className="text-3xl font-bold text-neutral-200 mt-1">{analytics?.summary?.totalAbsent || 0}</p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-red-950/30 flex items-center justify-center border border-red-900/30">
                   <XCircle className="h-6 w-6 text-red-500" />
@@ -601,7 +614,7 @@ export default function AdminPage() {
                       dataKey="value"
                       stroke="none"
                     >
-                      {analytics?.statusDistribution.map((entry, index) => (
+                      {analytics?.statusDistribution?.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>

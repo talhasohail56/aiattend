@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     // Let's fetch all attendances raw too.
 
     const allAttendances = await prisma.$queryRaw`
-        SELECT "userId", status FROM "Attendance"
+        SELECT "userId", status, "shiftDate" FROM "Attendance"
     ` as any[];
 
     // Map attendances to users
@@ -46,13 +46,9 @@ export async function GET(req: NextRequest) {
     }));
 
     // Filter in memory to handle stale Prisma Client
-    // We filter OUT 'ADMIN' so that any other role (EMPLOYEE, MANAGER, or even undefined/unknown) is shown.
-    // This is safer when the DB schema and Client are slightly out of sync.
     console.log(`[API] Fetching employees. Total users found: ${allUsers.length}`);
 
     const employees = usersWithAttendances.filter(u => {
-      // debug log
-      // console.log(`User ${u.id} (${u.name}) has role: ${u.role}`);
       return u.role !== 'ADMIN';
     });
 
@@ -60,29 +56,90 @@ export async function GET(req: NextRequest) {
 
     // Calculate stats for each employee
     const employeesWithStats = employees.map((emp) => {
-      const total = emp.attendances.length
+      // 1. Calculate explicit stats
       const onTime = emp.attendances.filter((a: any) => a.status === AttendanceStatus.ON_TIME).length
       const late = emp.attendances.filter((a: any) => a.status === AttendanceStatus.LATE).length
-      const absent = emp.attendances.filter((a: any) => a.status === AttendanceStatus.ABSENT).length
+      const overTime = emp.attendances.filter((a: any) => a.status === 'OVERTIME').length
+      // Explicit 'ABSENT' status (e.g. manual admin override)
+      const explicitAbsent = emp.attendances.filter((a: any) => a.status === AttendanceStatus.ABSENT).length
       const noCheckout = emp.attendances.filter((a: any) => a.status === AttendanceStatus.NO_CHECKOUT).length
 
-      const onTimeRate = total > 0 ? Math.round((onTime / total) * 100) : 0
-      const lateRate = total > 0 ? Math.round((late / total) * 100) : 0
-      const absentRate = total > 0 ? Math.round((absent / total) * 100) : 0
+      // 2. Calculate Inferred Absent
+      // Iterate last 30 days (or since creation if newer) to find dates with NO attendance.
+      let inferredAbsent = 0
+      const now = new Date()
+      // Normalize 'now' to start of day for comparison
+      now.setHours(0, 0, 0, 0)
+
+      const joinedDate = new Date(emp.createdAt)
+      joinedDate.setHours(0, 0, 0, 0)
+
+      // Look back 30 days max
+      const lookbackDays = 30
+      // Start counting from: MAX(JoinedDate, Today - 30 days)
+      const thirtyDaysAgo = new Date(now)
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - lookbackDays)
+
+      let loopDate = new Date(joinedDate > thirtyDaysAgo ? joinedDate : thirtyDaysAgo)
+
+      // Loop until Yesterday (don't count today as absent yet unless it's past check-in time? Let's just do up to yesterday for safety)
+      // Actually user asked "one employee didnt check in today". So we should include Today if query time > checkin time?
+      // Simpler: Loop until Yesterday. If 'Today' is missed, it shows up tomorrow. 
+      // User request implies immediate visibility. "one employee didnt check in... today".
+      // Let's include Today in the loop.
+
+      while (loopDate < now) {
+        // Check if any attendance matches this loopDate (shiftDate)
+        // shiftDate from DB is typically ISO string matching start of day or similar
+        // We need robust comparison.
+        // DB shiftDate: "2023-10-27T00:00:00.000Z" (if purely date) or "2023-10-27T22:00..."
+
+        const hasRecord = emp.attendances.some((a: any) => {
+          const aDate = new Date(a.shiftDate)
+          return aDate.getDate() === loopDate.getDate() &&
+            aDate.getMonth() === loopDate.getMonth() &&
+            aDate.getFullYear() === loopDate.getFullYear()
+        })
+
+        if (!hasRecord) {
+          inferredAbsent++
+        }
+
+        // Next day
+        loopDate.setDate(loopDate.getDate() + 1)
+      }
+
+      // Total Absent = Explicit + Inferred
+      const absent = explicitAbsent + inferredAbsent
+
+      // Total "Work Days" considered = Present records + Absent days
+      // Note: emp.attendances.length includes explicit records.
+      // If we add inferredAbsent, we get total logical days.
+      // Wait, emp.attendances includes 'explicitAbsent'.
+      // So 'total' records = onTime + late + overTime + explicitAbsent + noCheckout.
+      // Effective Total Days = total (records) + inferredAbsent.
+
+      const totalRecords = emp.attendances.length
+      const totalDays = totalRecords + inferredAbsent
+
+      const onTimeRate = totalDays > 0 ? Math.round((onTime / totalDays) * 100) : 0
+      const lateRate = totalDays > 0 ? Math.round((late / totalDays) * 100) : 0
+      const absentRate = totalDays > 0 ? Math.round((absent / totalDays) * 100) : 0
 
       // Flag as "red" if late + absent rate is over 30%
-      const isRedFlag = total >= 5 && (lateRate + absentRate) > 30
+      const isRedFlag = totalDays >= 5 && (lateRate + absentRate) > 30
 
-      // Remove attendances array from response (we only needed it for calculation)
+      // Remove attendances array from response
       const { attendances, ...empWithoutAttendances } = emp
 
       return {
         ...empWithoutAttendances,
         stats: {
-          total,
+          total: totalDays,
           onTime,
           late,
           absent,
+          overTime,
           noCheckout,
           onTimeRate,
           lateRate,

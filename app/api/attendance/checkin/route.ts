@@ -91,6 +91,8 @@ export async function POST(req: NextRequest) {
     const scheduledCheckIn = new Date(scheduledIsoString)
 
     // Calculate difference in minutes (scheduled - now)
+    // scheduled > now => diff is positive (Early)
+    // scheduled < now => diff is negative (Late)
     const diffMinutes = (scheduledCheckIn.getTime() - now.getTime()) / (1000 * 60)
 
     console.log('CheckIn Debug:', {
@@ -105,6 +107,18 @@ export async function POST(req: NextRequest) {
     if (diffMinutes > 60) {
       return NextResponse.json(
         { error: 'Too early. You can only check in 1 hour before your shift.' },
+        { status: 400 }
+      )
+    }
+
+    // If trying to check in more than 4 hours late (e.g. shift started 4 hours ago)
+    // Exception: If manager overrides? We assume overrides update the SCHEDULED time.
+    // So if you are 5 hours late for scheduled time, you are absent or half day.
+    // Let's just block > 4 hours late to prevent accidental "Yesterday" match.
+    // diffMinutes is negative for late. -240 = 4 hours late.
+    if (diffMinutes < -240) {
+      return NextResponse.json(
+        { error: 'It is too late to check in for this shift. Please contact admin.' },
         { status: 400 }
       )
     }

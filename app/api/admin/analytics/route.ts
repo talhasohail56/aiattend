@@ -65,6 +65,51 @@ export async function GET(req: NextRequest) {
             }
         })
 
+        // Get employees to calculate inferred absences
+        const employees = await prisma.user.findMany({
+            where: { role: { not: 'ADMIN' } },
+            select: { id: true, createdAt: true }
+        })
+
+        // Fetch ALL attendance history (lightweight) to accurately check past absences
+        // This is necessary because looking at just "last 7 days" or "counts" isn't enough for global accurate stats
+        const allAttendances = await prisma.attendance.findMany({
+            select: {
+                userId: true,
+                shiftDate: true,
+                status: true
+            }
+        })
+
+        // Create a lookup set for O(1) checking: "userId-YYYY-MM-DD"
+        const attendanceLookup = new Set<string>()
+        allAttendances.forEach(a => {
+            const dateStr = format(new Date(a.shiftDate), 'yyyy-MM-dd')
+            attendanceLookup.add(`${a.userId}-${dateStr}`)
+        })
+
+        // UPDATE WEEKLY TRENDS
+        Object.keys(dailyData).forEach(dateStr => {
+            const d = new Date(dateStr)
+            const dayOfWeek = d.getDay()
+            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+            // Don't count absent for today (shift might not be over) or future
+            const isTodayOrFuture = d >= startOfDay(new Date())
+
+            if (!isWeekend && !isTodayOrFuture) {
+                // Check each employee
+                employees.forEach(e => {
+                    // Only if employee existed on this date
+                    if (new Date(e.createdAt) <= d) {
+                        const hasRecord = attendanceLookup.has(`${e.id}-${dateStr}`)
+                        if (!hasRecord) {
+                            dailyData[dateStr].absent++
+                        }
+                    }
+                })
+            }
+        })
+
         const weeklyTrends = Object.entries(dailyData).map(([date, data]) => ({
             date: format(new Date(date), 'EEE'),
             fullDate: date,
@@ -84,11 +129,86 @@ export async function GET(req: NextRequest) {
             return acc
         }, {} as Record<string, number>)
 
-        const totalOnTime = statusCounts[AttendanceStatus.ON_TIME] || 0
-        const totalLate = statusCounts[AttendanceStatus.LATE] || 0
-        const totalAbsent = statusCounts[AttendanceStatus.ABSENT] || 0
-        const totalNoCheckout = statusCounts[AttendanceStatus.NO_CHECKOUT] || 0
-        const totalEarly = statusCounts[AttendanceStatus.EARLY] || 0
+        const totalOnTime = statusCounts['ON_TIME'] || 0
+        const totalLate = statusCounts['LATE'] || 0
+        const dbAbsent = statusCounts['ABSENT'] || 0
+        const totalNoCheckout = statusCounts['NO_CHECKOUT'] || 0
+        const totalEarly = statusCounts['EARLY'] || 0
+        const totalOvertime = statusCounts['OVERTIME'] || 0
+        const totalExcused = statusCounts['EXCUSED'] || 0
+
+        // CALCULATE TOTAL ABSENT (Global inferred) BY ITERATION
+        // This is the most accurate way: Check every Past Work Day for every Employee.
+
+        // We need checkOutTime AND checkInTime for "Today" night shift logic
+        const employeesWithTime = await prisma.user.findMany({
+            where: { role: { not: 'ADMIN' } },
+            select: {
+                id: true,
+                createdAt: true,
+                checkOutTime: true,
+                checkInTime: true
+            }
+        })
+
+        let inferredTotalAbsent = 0
+        const todayEnd = startOfDay(new Date())
+        // We want to iterate up to "Today" to check if shift passed
+
+        employeesWithTime.forEach(e => {
+            const start = startOfDay(new Date(e.createdAt))
+            const current = new Date(start)
+            const now = new Date()
+
+            while (current <= todayEnd) {
+                const dayOfWeek = current.getDay()
+                // We count ALL days including weekends now, as users operate on weekends.
+
+                const dateStr = format(current, 'yyyy-MM-dd')
+
+                // Logic for Today
+                let shouldCount = true
+                if (current.getTime() === todayEnd.getTime()) {
+                    // It is today. Only count if shift is OVER.
+
+                    const checkInStr = e.checkInTime || '09:00'
+                    const checkOutStr = e.checkOutTime || '18:00'
+
+                    const [inH, inM] = checkInStr.split(':').map(Number)
+                    const [outH, outM] = checkOutStr.split(':').map(Number)
+
+                    const shiftEnd = new Date(current)
+                    // current is startOfDay (00:00).
+                    shiftEnd.setHours(outH, outM, 0, 0)
+
+                    // If overnight shift (CheckOut < CheckIn), then Shift End is Tomorrow
+                    // e.g. In 21:00, Out 05:00. 
+                    // current is Today. shiftEnd initial is Today 05:00.
+                    // But for Today's shift (starts 21:00), end is Tomorrow 05:00.
+                    // So we must add 1 day.
+                    if (outH < inH) {
+                        shiftEnd.setDate(shiftEnd.getDate() + 1)
+                    }
+
+                    // Robustness: Add 5 hours grace.
+                    shiftEnd.setHours(shiftEnd.getHours() + 5)
+
+                    if (now < shiftEnd) {
+                        shouldCount = false
+                    }
+                }
+
+                if (shouldCount) {
+                    const hasRecord = attendanceLookup.has(`${e.id}-${dateStr}`)
+                    if (!hasRecord) {
+                        inferredTotalAbsent++
+                    }
+                }
+                current.setDate(current.getDate() + 1)
+            }
+        })
+
+        const totalAbsent = dbAbsent + inferredTotalAbsent
 
         const statusDistribution = [
             { name: 'On Time', value: totalOnTime, color: '#22c55e' },
@@ -96,12 +216,11 @@ export async function GET(req: NextRequest) {
             { name: 'Absent', value: totalAbsent, color: '#ef4444' },
             { name: 'No Checkout', value: totalNoCheckout, color: '#6b7280' },
             { name: 'Early', value: totalEarly, color: '#3b82f6' },
+            { name: 'Overtime', value: totalOvertime, color: '#a855f7' },
         ]
 
         // Get employee count
-        const employeeCount = await prisma.user.count({
-            where: { role: 'EMPLOYEE' },
-        })
+        const employeeCount = employees.length
 
         return NextResponse.json({
             weeklyTrends,
@@ -112,7 +231,10 @@ export async function GET(req: NextRequest) {
                 totalLate,
                 totalAbsent,
                 totalNoCheckout,
-                total: totalOnTime + totalLate + totalAbsent + totalNoCheckout,
+                totalOvertime,
+                // Total is now simply sum of all records + inferred absents 
+                // (This represents "Total Shifts Expected" essentially)
+                total: totalOnTime + totalLate + totalAbsent + totalNoCheckout + totalEarly + totalOvertime
             },
         })
     } catch (error) {

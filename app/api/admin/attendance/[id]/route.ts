@@ -74,6 +74,43 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    // Handle Inferred "Absent" records
+    if (params.id.startsWith('absent_')) {
+      // Format: absent_userId_timestamp OR absent_timestamp (if mocked inside loop)?
+      // Previous code: `absent_${emp.id}_${d.getTime()}`
+
+      const parts = params.id.split('_')
+      // parts[0] = "absent"
+      // parts[1] = userId
+      // parts[2] = timestamp
+
+      if (parts.length === 3) {
+        const userId = parts[1]
+        const timestamp = parseInt(parts[2])
+        const shiftDate = new Date(timestamp)
+
+        // Validate dates
+        if (isNaN(shiftDate.getTime())) {
+          return NextResponse.json({ error: 'Invalid date in ID' }, { status: 400 })
+        }
+
+        // Create an "EXCUSED" record to prevent it from showing up as Absent again
+        await prisma.attendance.create({
+          data: {
+            userId: userId,
+            shiftDate: shiftDate,
+            status: 'EXCUSED' as any, // Use string literal for compatibility
+            // No check in/out times needed
+          }
+        })
+
+        return NextResponse.json({ success: true, message: 'Marked as Excused' })
+      } else {
+        return NextResponse.json({ error: 'Invalid absent ID format' }, { status: 400 })
+      }
+    }
+
+    // Normal Delete for real records
     await prisma.attendance.delete({
       where: { id: params.id },
     })

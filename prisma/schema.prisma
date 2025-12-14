@@ -17,12 +17,13 @@ enum UserRole {
 }
 
 enum AttendanceStatus {
-  EARLY
   ON_TIME
   LATE
+  EARLY
   ABSENT
   NO_CHECKOUT
   OVERTIME
+  EXCUSED
 }
 
 model User {

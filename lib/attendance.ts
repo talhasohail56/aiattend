@@ -51,25 +51,16 @@ export function getShiftDate(
   const [checkOutHours, checkOutMinutes] = checkOutTime.split(':').map(Number)
 
   // 1. Get Current 'Wall Clock' Time in Target Timezone (PKT)
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: DEFAULT_TIMEZONE,
-    year: 'numeric',
-    month: 'numeric', // 1-12
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    hour12: false,
-  })
+  // We manually adjust UTC time to PKT (UTC+5) to avoid Intl environment issues.
 
-  // Format parts to reliable object
-  const parts = formatter.formatToParts(date)
-  const getPart = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  const utcDate = new Date(date.getTime())
+  const pktDate = new Date(utcDate.getTime() + (5 * 60 * 60 * 1000))
 
-  let currentYear = parseInt(getPart('year'))
-  let currentMonth = parseInt(getPart('month')) // 1-12
-  let currentDay = parseInt(getPart('day'))
-  const currentHour = parseInt(getPart('hour') === '24' ? '0' : getPart('hour'))
-  const currentMinute = parseInt(getPart('minute'))
+  let currentYear = pktDate.getUTCFullYear()
+  let currentMonth = pktDate.getUTCMonth() + 1 // 1-12
+  let currentDay = pktDate.getUTCDate()
+  let currentHour = pktDate.getUTCHours()
+  let currentMinute = pktDate.getUTCMinutes()
 
   // 2. Determine Logic based on 'Wall Clock' time
   const isOvernight = checkInHours > checkOutHours || (checkInHours === checkOutHours && checkInMinutes > checkOutMinutes)
@@ -83,21 +74,35 @@ export function getShiftDate(
   const CHECK_OUT_GRACE_HOURS = 5
 
   if (isOvernight) {
-    // Calculate the "cutoff" time for the previous shift status
-    // Standard: strict checkOutHours.
-    // Extended: checkOutHours + grace.
-    // We compare hours * 60 + minutes to be safe/simple.
+    // Determine if we are technically in the "morning after" the start date.
+    // E.g. Shift 22:00 - 05:00. Current is 04:00.
+    // We are before the logic "day flip" which happens at midnight? No.
+    // We are in the new day physically.
+
+    // If currentHour < checkOutHours (e.g. 4 < 5), we are still completing the previous night's shift.
+    // If currentHour >= checkOutHours (e.g. 8 >= 5), we have crossed the shift line.
+    // For a NEW check-in, we shouldn't assume it's the old shift if it's past the scheduled end.
+    // (Grace period helps for *checkout* but for *checkin* it confuses things).
+
+    // Assume cut-off is strictly the check-out time.
+    // Any check-in AFTER check-out time is considered "Early for Next Shift" rather than "Late for Last Shift".
+
+    // BUT: What if someone is 1 hour late for a 05:00 end? check-in 05:30?
+    // They are LATE for yesterday.
+
+    // Let's use a smaller buffer for Check-In association. say 2 hours?
+    // User was 08:38 (3.5 hours after 05:00).
+    // Let's set a "Shift End Buffer" of 2 hours.
+
+    const SHIFT_END_BUFFER_MINUTES = 2 * 60
 
     const currentTotalMinutes = currentHour * 60 + currentMinute
     const checkOutTotalMinutes = checkOutHours * 60 + checkOutMinutes
-    const extendedCutoffMinutes = checkOutTotalMinutes + (CHECK_OUT_GRACE_HOURS * 60)
+    const extendedCutoffMinutes = checkOutTotalMinutes + SHIFT_END_BUFFER_MINUTES
 
-    // If we are in the "Next Day" relative to midnight, but BEFORE the extended cutoff...
-    // Then we still belong to the previous night's shift.
     if (currentTotalMinutes < extendedCutoffMinutes) {
-      // It's early morning (or late morning grace period), but belongs to previous night's shift
-      // Subtract 1 day from the current PKT date
-      const d = new Date(currentYear, currentMonth - 1, currentDay) // Month is 0-indexed
+      // It belongs to previous night
+      const d = new Date(currentYear, currentMonth - 1, currentDay)
       d.setDate(d.getDate() - 1)
       shiftYear = d.getFullYear()
       shiftMonth = d.getMonth() + 1
@@ -151,47 +156,14 @@ export function getShiftStartTimestamp(shiftDateNaive: Date, checkInTimeStr: str
 /**
  * Get check-in deadline (check-in time + late threshold)
  */
-/**
- * Get check-in deadline (check-in time + late threshold)
- */
 export function getCheckInDeadline(
   shiftDate: Date,
   userCheckInTime?: string | null
 ): Date {
+  // shiftDate is already the calculated Start Time of the shift (e.g. 10:00 AM today).
+  // We simply need to add the grace period (threshold).
+
   const deadline = new Date(shiftDate)
-
-  // If a specific check-in time is provided (e.g. from override), update the deadline hour/minute
-  if (userCheckInTime) {
-    const [hours, minutes] = userCheckInTime.split(':').map(Number)
-    // We need to be careful about timezone. 
-    // shiftDate is "YYYY-MM-DDTHH:mm:00+05:00".
-    // We want to keep YYYY-MM-DD and Offset, but change HH:mm.
-    // Since we are running in an environment where New Date() might be UTC...
-
-    // Ideally we'd use setHours(), but that sets Local hours (env dependent).
-    // Let's rely on the fact that shiftDate was constructed with the correct offset.
-    // Actually, the safest way is to rebuild the ISO string same as getShiftDate does.
-
-    // Parse the existing ISO parts from shiftDate
-    // The shiftDate is a Date object. formatting it might convert to UTC.
-    // Let's assume shiftDate is correct.
-
-    // Easier approach: 
-    // Calculate difference between Default Time (on shiftDate) and New Time.
-    // Add that difference.
-
-    const checkInTime = getUserCheckInTime(null) // Default 22:00
-    const [defHours, defMinutes] = checkInTime.split(':').map(Number)
-
-    const defaultMinutes = defHours * 60 + defMinutes
-    const targetMinutes = hours * 60 + minutes
-
-    const diffMinutes = targetMinutes - defaultMinutes
-
-    // Adjust deadline by the difference in schedule
-    deadline.setMinutes(deadline.getMinutes() + diffMinutes)
-  }
-
   deadline.setMinutes(deadline.getMinutes() + LATE_THRESHOLD_MINUTES)
   return deadline
 }

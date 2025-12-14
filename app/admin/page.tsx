@@ -123,7 +123,14 @@ export default function AdminPage() {
   // Role Edit State
   const [roleDialogOpen, setRoleDialogOpen] = useState(false)
   const [roleEmployee, setRoleEmployee] = useState<Employee | null>(null)
+
   const [selectedRole, setSelectedRole] = useState('')
+
+  // Task Assignment State
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDate, setTaskDate] = useState(new Date().toISOString().split('T')[0])
+  const [selectedTaskEmployeeId, setSelectedTaskEmployeeId] = useState('')
+  const [isAssigningTask, setIsAssigningTask] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -358,6 +365,37 @@ export default function AdminPage() {
       loadData()
     } catch (error: any) {
       alert(error.message || 'Failed to update times')
+    }
+  }
+
+  const handleAssignTask = async () => {
+    if (!taskTitle || !taskDate || !selectedTaskEmployeeId) return
+    setIsAssigningTask(true)
+
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: taskTitle,
+          date: taskDate,
+          userId: selectedTaskEmployeeId // Admin assigning to specific user
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to assign task')
+      }
+
+      setTaskTitle('')
+      setTaskDate(new Date().toISOString().split('T')[0])
+      setSelectedTaskEmployeeId('')
+      alert('Task assigned successfully')
+    } catch (error) {
+      console.error('Failed to assign task:', error)
+      alert('Failed to assign task')
+    } finally {
+      setIsAssigningTask(false)
     }
   }
 

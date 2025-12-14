@@ -78,13 +78,25 @@ export function getShiftDate(
   let shiftMonth = currentMonth
   let shiftDay = currentDay
 
+  // Grace period to allow late checkouts (e.g. 5 hours after shift ends)
+  // If undefined, default to 5 hours as per request
+  const CHECK_OUT_GRACE_HOURS = 5
+
   if (isOvernight) {
-    if (currentHour < checkOutHours || (currentHour === checkOutHours && currentMinute < checkOutMinutes)) {
-      // It's early morning (e.g. 2am), but belongs to previous night's shift
+    // Calculate the "cutoff" time for the previous shift status
+    // Standard: strict checkOutHours.
+    // Extended: checkOutHours + grace.
+    // We compare hours * 60 + minutes to be safe/simple.
+
+    const currentTotalMinutes = currentHour * 60 + currentMinute
+    const checkOutTotalMinutes = checkOutHours * 60 + checkOutMinutes
+    const extendedCutoffMinutes = checkOutTotalMinutes + (CHECK_OUT_GRACE_HOURS * 60)
+
+    // If we are in the "Next Day" relative to midnight, but BEFORE the extended cutoff...
+    // Then we still belong to the previous night's shift.
+    if (currentTotalMinutes < extendedCutoffMinutes) {
+      // It's early morning (or late morning grace period), but belongs to previous night's shift
       // Subtract 1 day from the current PKT date
-      // We can use a Date object to handle month/year rollover easily
-      // Create a date at Noon (avoid DST issues) in local, subtract day, read back components
-      // Actually strictly:
       const d = new Date(currentYear, currentMonth - 1, currentDay) // Month is 0-indexed
       d.setDate(d.getDate() - 1)
       shiftYear = d.getFullYear()

@@ -90,17 +90,26 @@ export async function sendLateNotificationEmail(
         return null
     }
 
+    // Determine subject and styling based on status
+    const isLate = status === 'LATE'
+    const subject = isLate
+        ? `🚨 LATE ALERT: ${employeeName}`
+        : `✅ CHECK-IN: ${employeeName} - ${status}`
+    const headerColor = isLate ? '#ef4444' : '#10b981'
+    const headerText = isLate ? 'Late Check-in Alert' : 'Check-in Notification'
+
     try {
         const { data, error } = await resend.emails.send({
             from: `Attendance System <${FROM_EMAIL}>`,
             to: [adminEmail],
-            subject: `LATE ALERT: ${employeeName}`,
+            subject,
             html: `
-        <h1>Late Check-in Alert</h1>
-        <p>Employee <strong>${employeeName}</strong> has checked in <strong>${status}</strong>.</p>
+        <h1 style="color: ${headerColor};">${headerText}</h1>
+        <p>Employee <strong>${employeeName}</strong> has checked in.</p>
         <p>Check-in Time: <strong>${time}</strong></p>
+        <p>Status: <strong style="color: ${headerColor};">${status}</strong></p>
         <br>
-        <p>Please review depending on your policy.</p>
+        <p style="color: #666; font-size: 12px;">This is an automated notification from the Attendance System.</p>
       `,
         })
 

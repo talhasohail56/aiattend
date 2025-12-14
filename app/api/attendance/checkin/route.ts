@@ -185,25 +185,23 @@ export async function POST(req: NextRequest) {
           status
         )
 
-        // 2. Notify Admins if LATE
-        if (status === AttendanceStatus.LATE) {
-          const admins = await prisma.user.findMany({
-            where: { role: 'ADMIN' },
-            select: { email: true }
-          })
+        // 2. Notify Admins for ALL check-ins (with status)
+        const admins = await prisma.user.findMany({
+          where: { role: 'ADMIN' },
+          select: { email: true }
+        })
 
-          // Send emails in parallel
-          await Promise.all(admins.map(admin => {
-            if (admin.email) {
-              return sendLateNotificationEmail(
-                admin.email,
-                session.user.name!,
-                formatTime(attendance.checkInAt),
-                status
-              )
-            }
-          }))
-        }
+        // Send emails in parallel
+        await Promise.all(admins.map(admin => {
+          if (admin.email) {
+            return sendLateNotificationEmail(
+              admin.email,
+              session.user.name!,
+              formatTime(attendance.checkInAt),
+              status
+            )
+          }
+        }))
       }
     } catch (emailError) {
       console.error('Failed to send check-in email:', emailError)

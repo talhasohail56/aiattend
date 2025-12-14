@@ -149,9 +149,11 @@ export async function GET(req: NextRequest) {
             }
 
             // Past day or shift has ended - mark as absent
+            // Create shiftDate at midnight PKT to prevent timezone-induced date shift
+            const shiftDatePKT = startOfDayPKT(d)
             mixedResults.push({
-              id: `absent_${emp.id}_${d.getTime()}`,
-              shiftDate: d.toISOString(),
+              id: `absent_${emp.id}_${shiftDatePKT.getTime()}`,
+              shiftDate: shiftDatePKT.toISOString(),
               checkInAt: null,
               checkOutAt: null,
               status: 'ABSENT',

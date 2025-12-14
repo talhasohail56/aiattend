@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { formatDate, formatTime, formatDateTime } from '@/lib/attendance'
-import { MapPin, LogOut, TrendingUp, Clock, XCircle, AlertCircle, CheckCircle, Timer, CalendarClock } from 'lucide-react'
+import { MapPin, LogOut, TrendingUp, Clock, XCircle, AlertCircle, CheckCircle, Timer, CalendarClock, Loader2 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select' // Added
@@ -520,7 +520,7 @@ export default function DashboardPage() {
                           if (now > checkOutDate) {
                             return (
                               <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2">
-                                <span className="text-emerald-400 block text-lg font-medium">Great work! You're on overtime using the grace period.</span>
+                                <span className="text-emerald-400 block text-lg font-medium">Great work! You&apos;re on overtime using the grace period.</span>
                                 <span>Current Session Active</span>
                               </div>
                             )
@@ -554,8 +554,8 @@ export default function DashboardPage() {
                       <div className="text-center z-10">
                         <p className="text-xs font-medium uppercase tracking-wider text-neutral-500 mb-1">Current Status</p>
                         <p className={`text-lg font-bold ${currentAttendance?.checkInAt && !currentAttendance?.checkOutAt
-                            ? 'text-emerald-400'
-                            : 'text-neutral-400'
+                          ? 'text-emerald-400'
+                          : 'text-neutral-400'
                           }`}>
                           {currentAttendance?.checkInAt && !currentAttendance?.checkOutAt ? "ON DUTY" : "OFF DUTY"}
                         </p>
@@ -587,8 +587,8 @@ export default function DashboardPage() {
                         onClick={handleCheckIn}
                         disabled={checkingIn || timeLeft !== 'SHIFT_ACTIVE'}
                         className={`w-full font-semibold h-12 transition-all hover:scale-[1.02] ${timeLeft === 'SHIFT_ACTIVE'
-                            ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]'
-                            : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                          ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-[0_0_20px_-5px_rgba(16,185,129,0.3)]'
+                          : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                           }`}
                       >
                         {checkingIn ? (

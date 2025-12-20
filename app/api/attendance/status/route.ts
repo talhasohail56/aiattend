@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
         checkOutAt: null,
       },
       orderBy: {
-        createdAt: 'desc',
+        shiftDate: 'desc',  // Get the most recent SHIFT DATE, not just most recently created
       },
     })
 

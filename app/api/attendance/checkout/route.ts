@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const now = new Date()
 
     // Find the latest OPEN attendance record (CheckIn not null, CheckOut null)
-    // We order by createdAt desc to get the most recent one.
+    // We order by shiftDate desc to get the most recent shift date.
     const attendance = await prisma.attendance.findFirst({
       where: {
         userId: session.user.id,
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
         checkOutAt: null,
       },
       orderBy: {
-        createdAt: 'desc'
+        shiftDate: 'desc'  // Get the most recent SHIFT DATE, not just most recently created
       }
     })
 

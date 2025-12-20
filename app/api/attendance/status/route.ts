@@ -17,6 +17,25 @@ export async function GET(req: NextRequest) {
       select: { checkInTime: true, checkOutTime: true },
     })
 
+    // FIRST: Check for any active/open shift (checked in but not checked out)
+    // This ensures employees can check out even when working overtime past their scheduled end time
+    const activeShift = await prisma.attendance.findFirst({
+      where: {
+        userId: session.user.id,
+        checkInAt: { not: null },
+        checkOutAt: null,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
+
+    // If there's an active shift, return it regardless of calculated shift date
+    if (activeShift) {
+      return NextResponse.json({ attendance: activeShift })
+    }
+
+    // Otherwise, fall back to checking for today's calculated shift date
     const now = new Date()
     const shiftDate = getShiftDate(now, user?.checkInTime, user?.checkOutTime)
 

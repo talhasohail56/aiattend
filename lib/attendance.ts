@@ -198,10 +198,23 @@ export function getCheckInDeadline(
   shiftDate: Date,
   userCheckInTime?: string | null
 ): Date {
-  // shiftDate is already the calculated Start Time of the shift (e.g. 10:00 AM today).
-  // We simply need to add the grace period (threshold).
+  let deadline: Date
 
-  const deadline = new Date(shiftDate)
+  if (userCheckInTime) {
+    // Use override/custom check-in time instead of the shiftDate's embedded time
+    const [hours, minutes] = userCheckInTime.split(':').map(Number)
+    // Reconstruct: shiftDate's date + userCheckInTime's HH:mm + PKT offset
+    const year = shiftDate.getFullYear()
+    const month = String(shiftDate.getMonth() + 1).padStart(2, '0')
+    const day = String(shiftDate.getDate()).padStart(2, '0')
+    const hh = String(hours).padStart(2, '0')
+    const mm = String(minutes).padStart(2, '0')
+    deadline = new Date(`${year}-${month}-${day}T${hh}:${mm}:00+05:00`)
+  } else {
+    // Use shiftDate as-is (already has correct time from getShiftDate)
+    deadline = new Date(shiftDate)
+  }
+
   deadline.setMinutes(deadline.getMinutes() + LATE_THRESHOLD_MINUTES)
   return deadline
 }
